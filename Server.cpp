@@ -10,34 +10,32 @@ Server::Server(void) {}
 
 Server::~Server(void) {
 	close(_serverSocket);
-	// close connection ?
 }
 
-void	Server::init(const std::string& dom, const std::string& tpe, int proto) {
+void	Server::init(const std::string& dom, const std::string& tpe, int proto, unsigned int port) {
 		_domain = (dom == "IPV6") ? AF_INET6 : AF_INET;
 		_type = (tpe == "TCP") ? SOCK_STREAM : SOCK_DGRAM;
 		_protocol = proto;
 		_serverSocket = socket(_domain, _type, _protocol);
+		_serverAddress.sin_family = _domain;
+		_serverAddress.sin_port = htons(port);
+		_serverAddress.sin_addr.s_addr = INADDR_ANY;
+		bind(_serverSocket, (struct sockaddr*)&_serverAddress, sizeof(_serverAddress));
+		listen(_serverSocket, 10);
 		std::cout << "server initialized successfully.\nDomain: "
 					<< dom << "\nType: " << tpe 
 					<< "\nProtocol: " 
 					<< (_protocol == 0 ? "default" : "unknow") << "\n";
 }
 
-void	Server::run(unsigned int port, const std::string& ip) {
-		_serverAddress.sin_family = _domain;
-		_serverAddress.sin_port = htons(port);
-		_serverAddress.sin_addr.s_addr = INADDR_ANY;
-
-		(void)ip;
-		bind(_serverSocket, (struct sockaddr*)&_serverAddress, sizeof(_serverAddress));
-		listen(_serverSocket, 5);
-		_clientSocket = accept(_serverSocket, NULL, NULL);
-		
-		char	buffer[1024] = {0};
-		recv(_clientSocket, buffer, sizeof(buffer), 0);
-		std::cout << "Message from client: " << buffer << "\n";
-		close(_serverSocket);
+void	Server::run(void) {
+		for (;;)
+		{
+			_clientSocket = accept(_serverSocket, (struct sockaddr*)&_remoteAddress, &_remoteAddressLen);
+			char	buffer[1024] = {0};
+			recv(_clientSocket, buffer, sizeof(buffer), 0);
+			std::cout << "Message from client: " << buffer << "\n";
+		}
 }
 
 std::string	Server::SocketError::_getErrnoMsg(int code) {

@@ -17,8 +17,8 @@
 int	main(void) {
 	try {
 	Server	myServer;
-	myServer.init("IPV4", "TCP", 0);
-	myServer.run(8080, "");
+	myServer.init("IPV4", "TCP", 0, 8080);
+	myServer.run();
 	} catch (std::exception& e) {
 		std::cerr << e.what() << "\n";
 	}
