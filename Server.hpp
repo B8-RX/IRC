@@ -23,6 +23,17 @@ class Server {
 					return (_message.c_str());
 				}
 		};
+		class	BindError : public std::exception {
+			private:
+				std::string		_message;
+				std::string		_getErrnoMsg(int code);
+			public:
+				BindError(int code) : _message(_getErrnoMsg(code)) {}
+				~BindError(void) throw() {}
+				virtual const char* what() const throw() {
+					return (_message.c_str());
+				}
+		};
 	private:
 		int			_domain;
 		int			_type;
