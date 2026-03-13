@@ -14,48 +14,46 @@ Server::~Server(void) {
 	close(_serverSocket);
 }
 
-void	Server::init(const std::string& dom, const std::string& tpe, int proto, unsigned int port) {
-		_domain = (dom == "IPV6") ? AF_INET6 : AF_INET;
-		_type = (tpe == "TCP") ? SOCK_STREAM : SOCK_DGRAM;
-		_protocol = proto;
+void	Server::init(uint16_t port) {
+	_port = port;
+	if ((_serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+		throw SocketError(errno);
+	}
+	_serverAddress.sin_family = AF_INET;
+	_serverAddress.sin_port = htons(_port);
+	_serverAddress.sin_addr.s_addr = INADDR_ANY;
 
-		;
-		if ((_serverSocket = socket(_domain, _type, _protocol)) == -1) {
+	if (bind(_serverSocket, (struct sockaddr*)&_serverAddress, sizeof(_serverAddress)) == -1) {
+		throw BindError(errno);
+	}
+	
+	if (listen(_serverSocket, 10) == -1) {
+		if (errno == EOPNOTSUPP) {
 			throw SocketError(errno);
+		} else {
+			throw std::runtime_error("Failed to listen on socket\n");
 		}
-		_serverAddress.sin_family = _domain;
-		_serverAddress.sin_port = htons(port);
-		_serverAddress.sin_addr.s_addr = INADDR_ANY;
+	}
 
-		if (bind(_serverSocket, (struct sockaddr*)&_serverAddress, sizeof(_serverAddress)) == -1) {
-			throw BindError(errno);
-		}
-		
-		if (listen(_serverSocket, 10) == -1) {
-			if (errno == EOPNOTSUPP) {
-				throw SocketError(errno);
-			} else {
-				throw std::runtime_error("Failed to listen on socket\n");
-			}
-		}
-
-		std::cout << "server initialized successfully.\nDomain: "
-					<< dom << "\nType: " << tpe 
-					<< "\nProtocol: " 
-					<< (_protocol == 0 ? "default" : "unknow") << "\n";
+	std::cout << "server initialized successfully.\n"
+				<< "Port: " << _port << "\n";
 }
 
 void	Server::run(void) {
 		for (;;)
 		{
-			_clientSocket = accept(_serverSocket, (struct sockaddr*)&_remoteAddress, &_remoteAddressLen);
+			if ((_clientSocket = accept(_serverSocket, (struct sockaddr*)&_remoteAddress, &_remoteAddressLen)) == -1) {
+				if (errno == EOPNOTSUPP) {
+					throw SocketError(errno);
+				} else {
+					throw std::runtime_error("Failed to accept connection\n");
+				}
+			}
 			char	buffer[1024] = {0};
-			recv(_clientSocket, buffer, sizeof(buffer), 0);
-			std::cout << "Connected in fd=" << _clientSocket << "\n";
-			std::cout << "Protocol name: " << getprotobynumber(_protocol)->p_name << "\n";
-
-			//  std::cout << " client connected from " << inet_ntoa(_remoteAddress.sin_addr) << ":" << ntohs(_remoteAddress.sin_port) << "\n";
-			std::cout << "Message from client: " << buffer << "\n";
+			if (recv(_clientSocket, buffer, sizeof(buffer), 0) == -1) {
+				throw std::runtime_error("Failed to receive data from client\n");
+			}
+			std::cout << "Received message from client: " << buffer << "\n";
 		}
 }
 

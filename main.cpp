@@ -13,11 +13,25 @@
 #include "Server.hpp"
 #include <exception>
 #include <iostream>
+#include <sstream>
 
-int	main(void) {
+int	main(int argc, char **argv) {
+	if (argc != 2) {
+		std::cerr << "Usage: " << argv[0] << " <port>\n";
+		return (1);
+	}
 	try {
 	Server	myServer;
-	myServer.init("IPV4", "TCP", 0, 8080);
+	std::istringstream iss(argv[1]);
+	uint16_t	port;
+	char	c;
+
+	if (!(iss >> port) || iss.get(c)) {
+		std::cerr << "Invalid port number: " << argv[1] << "\n";
+		return (1);
+	}
+
+	myServer.init(port);
 	myServer.run();
 	} catch (std::exception& e) {
 		std::cerr << e.what() << "\n";
