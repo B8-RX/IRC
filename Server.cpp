@@ -50,10 +50,12 @@ void	Server::run(void) {
 				}
 			}
 			char	buffer[1024] = {0};
+			memset(buffer, 0, sizeof(buffer));
 			if (recv(_clientSocket, buffer, sizeof(buffer), 0) == -1) {
 				throw std::runtime_error("Failed to receive data from client\n");
 			}
-			std::cout << "Received message from client: " << buffer << "\n";
+			std::cout << "Received message from client: [" << _clientSocket 
+					  << "]\nMessage: "  << buffer << "\n";
 		}
 }
 
