@@ -14,27 +14,58 @@
 #include <exception>
 #include <iostream>
 #include <sstream>
+#include <cerrno>
+#include <cstring>
 
 int	main(int argc, char **argv) {
 	if (argc != 2) {
 		std::cerr << "Usage: " << argv[0] << " <port>\n";
 		return (1);
 	}
-	try {
-	Server	myServer;
-	std::istringstream iss(argv[1]);
-	uint16_t	port;
-	char	c;
-
-	if (!(iss >> port) || iss.get(c)) {
-		std::cerr << "Invalid port number: " << argv[1] << "\n";
+/*!
+ * @brief Set up signal handlers
+ */
+	struct sigaction act;
+	act.sa_handler = &Server::sighandler;
+	sigemptyset(&act.sa_mask);
+	act.sa_flags = 0;
+/*!
+ * @brief Set up Ctrl+C signal handlers
+ */
+	if (sigaction(SIGINT, &act, NULL) == -1) {
+		std::cerr << "Failed to set signal handler: " << std::strerror(errno) << "\n";
+		return (1);
+	}
+/*!
+ * @brief Set up Ctrl+\ signal handlers
+ */
+	if (sigaction(SIGQUIT, &act, NULL) == -1) {
+		std::cerr << "Failed to set signal handler: " << std::strerror(errno) << "\n";
 		return (1);
 	}
 
+	Server	myServer;
+	try {
+/*!
+ * @brief Check if the port is valid
+ * @param argv The command line arguments
+ */
+	std::istringstream iss(argv[1]);
+	uint16_t	port;
+	char	c;
+	if (!(iss >> port) || iss >> c) {
+		std::cerr << "Invalid port number: " << argv[1] << "\n";
+		return (1);
+	}
+/*!
+ * @brief Initialize the server
+ * @param port The port number to listen on
+ */
 	myServer.init(port);
 	myServer.run();
 	} catch (std::exception& e) {
 		std::cerr << e.what() << "\n";
 	}
+	std::cout << "Server Closed! Bye Bye!\n";
 	return (0);
 }

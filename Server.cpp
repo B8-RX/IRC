@@ -7,14 +7,18 @@
 #include <unistd.h>
 #include <cerrno>
 #include <netdb.h>
+#include <stdlib.h>
+
+bool Server::_signalReceived = false;
 
 Server::Server(void) {}
 
 Server::~Server(void) {
-	close(_serverSocket);
+	closeSockets();
 }
 
 void	Server::init(uint16_t port) {
+	struct pollfd	pollfd;
 	_port = port;
 	if ((_serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
 		throw SocketError(errno);
@@ -34,29 +38,37 @@ void	Server::init(uint16_t port) {
 			throw std::runtime_error("Failed to listen on socket\n");
 		}
 	}
-
+	pollfd.fd = _serverSocket;
+	pollfd.events = POLLIN;
+	_pollfd_list.push_back(pollfd);
 	std::cout << "server initialized successfully.\n"
 				<< "Port: " << _port << "\n";
 }
 
+void	Server::closeSockets(void) {
+	for (size_t i = 0; i < _pollfd_list.size(); ++i) {
+		std::cout << "Closing socket fd: " << _pollfd_list[i].fd << "\n";
+		close(_pollfd_list[i].fd);
+	}
+}
+
 void	Server::run(void) {
-		for (;;)
-		{
-			if ((_clientSocket = accept(_serverSocket, (struct sockaddr*)&_remoteAddress, &_remoteAddressLen)) == -1) {
-				if (errno == EOPNOTSUPP) {
-					throw SocketError(errno);
-				} else {
-					throw std::runtime_error("Failed to accept connection\n");
-				}
-			}
-			char	buffer[1024] = {0};
-			memset(buffer, 0, sizeof(buffer));
-			if (recv(_clientSocket, buffer, sizeof(buffer), 0) == -1) {
-				throw std::runtime_error("Failed to receive data from client\n");
-			}
-			std::cout << "Received message from client: [" << _clientSocket 
-					  << "]\nMessage: "  << buffer << "\n";
-		}
+ // TODO: implement the main server loop using poll to handle multiple clients
+ while (_signalReceived == false) {
+
+ }
+}
+
+void Server::sighandler(int signum) {
+	std::cout << "Signal received: ";
+	if (signum == SIGINT)
+		std::cout << "Ctrl+C\n";
+	else if (signum == SIGQUIT)
+		std::cout << "Ctrl+\\\n";
+	else
+		std::cout << "Unknown signal: " << signum << "\n";
+	_signalReceived = true;
+	// exit(0);
 }
 
 std::string	Server::SocketError::_getErrnoMsg(int code) {
