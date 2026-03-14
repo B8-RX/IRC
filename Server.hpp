@@ -19,24 +19,12 @@ class Server {
 		void	init(uint16_t port);
 		void	run(void);
 		void	closeSockets(void);
-		class	SocketError : public std::exception {
+		class	ErrorException : public std::exception {
 			private:
 				std::string		_message;
-				std::string		_getErrnoMsg(int code);
 			public:
-				SocketError(int code) : _message(_getErrnoMsg(code)) {}
-				~SocketError(void) throw() {}
-				virtual const char* what() const throw() {
-					return (_message.c_str());
-				}
-		};
-		class	BindError : public std::exception {
-			private:
-				std::string		_message;
-				std::string		_getErrnoMsg(int code);
-			public:
-				BindError(int code) : _message(_getErrnoMsg(code)) {}
-				~BindError(void) throw() {}
+				ErrorException(const std::string& message) : _message(message) {}
+				virtual ~ErrorException() throw() {}
 				virtual const char* what() const throw() {
 					return (_message.c_str());
 				}
