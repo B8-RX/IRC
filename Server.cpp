@@ -55,6 +55,9 @@ void	Server::closeSockets(void) {
 void	Server::run(void) {
  // TODO: implement the main server loop using poll to handle multiple clients
  while (_signalReceived == false) {
+// TODO after catching an event, if it's a new connection, accept it and add the new client socket to the pollfd list
+// TODO if it's an existing client socket, read the data, parse the request, execute the appropriate handler, and send the response back to the client:
+//? FRAMING, PARSING, EXECUTION, RESPONSE"
 
  }
 }
