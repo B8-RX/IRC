@@ -8,8 +8,10 @@
 #include <vector>
 #include <poll.h>
 #include <signal.h>
+#include "Client.hpp"
+#include <map>
 
-// class Client;
+// class Channel;
 
 class Server {
 	public:
@@ -31,13 +33,16 @@ class Server {
 		};
 	private:
 		static bool					_signalReceived;
-		// std::vector<Client>		_client_list;
+		std::map<int, Client>		_client_list; 
+		// std::map<int, Channel>		_channel_list;
 		std::vector<struct pollfd>	_pollfd_list;
 		uint16_t					_port;
 		int							_clientSocket;
 		sockaddr_in					_serverAddress;
-		sockaddr_in					_remoteAddress;
-		socklen_t					_remoteAddressLen;
+		sockaddr_in					_peerAddress;
+		socklen_t					_peerAddressLen;
 		int							_serverSocket;
+		void						HandleNewClient(void);
+		void						HandleReceivedData(int clientSocket);
 	};
 #endif // !SERVER_HPP
