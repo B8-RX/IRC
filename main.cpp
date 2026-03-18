@@ -65,6 +65,7 @@ int	main(int argc, char **argv) {
 	myServer.run();
 	} catch (std::exception& e) {
 		std::cerr << e.what() << "\n";
+		myServer.closeSockets();
 	}
 	std::cout << "Server Closed! Bye Bye!\n";
 	return (0);

@@ -3,19 +3,19 @@
 
  
  #include <string>
+ #include <sys/socket.h>
+ #include <netinet/in.h>
+
 
  class Client {
-    private:
-        int             _fd;
-        std::string     _ipAddr;
-    public:
+     public:
+        int             fd;
+        std::string     ipAddr;
+        uint16_t        port;
+        sockaddr_in		address;
+		socklen_t		addressLen;
         Client(void);
         ~Client(void);
-        void            setClientFd(int fd);
-        void            setClientIpAddr(const std::string& ipAddr);
-        int             getClientFd(void);
-        std::string&    getClientIpAddr(void);
-
  };
 
 #endif // !CLIENT_HPP

@@ -39,8 +39,6 @@ class Server {
 		uint16_t					_port;
 		int							_clientSocket;
 		sockaddr_in					_serverAddress;
-		sockaddr_in					_peerAddress;
-		socklen_t					_peerAddressLen;
 		int							_serverSocket;
 		void						HandleNewClient(void);
 		void						HandleReceivedData(int clientSocket);
