@@ -7,15 +7,22 @@
  #include <netinet/in.h>
 
 
+ class Channel;
+
  class Client {
      public:
-        int             fd;
-        std::string     ipAddr;
-        uint16_t        port;
-        sockaddr_in		address;
-		socklen_t		addressLen;
         Client(void);
         ~Client(void);
+        
+        int                     fd;
+        std::string             ipAddr;
+        uint16_t                port;
+        std::string             buffer_in;
+        std::string             buffer_out;
+        std::string             nickname;
+        std::string             username;
+        bool                    connected;
+        std::map<int, Channel>  channels;
  };
 
 #endif // !CLIENT_HPP

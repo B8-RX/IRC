@@ -63,7 +63,6 @@ void	Server::init(uint16_t port) {
 
 
 void	Server::HandleNewClient(void) {
-	//TODO create new object Client, create a socket and push objet to Client list
 	Client 			client;
 	int				clientFd;
 	sockaddr_in		clientAdd;
@@ -85,6 +84,7 @@ void	Server::HandleNewClient(void) {
 	newPollfd.revents = 0;
 	client.fd = clientFd;
 	client.ipAddr = inet_ntoa(clientAdd.sin_addr);
+	client.connected = false;
 	_client_list[clientFd] = client;
 	_pollfd_list.push_back(newPollfd);
 	
@@ -102,25 +102,20 @@ void	Server::HandleReceivedData(int clientSocket) {
 void	Server::run(void) {
 	while (_signalReceived == false) {
 		for (size_t i = 0; i < _pollfd_list.size(); ++i) {
-			if (poll(&_pollfd_list[0], _pollfd_list.size(), 0) == -1 && _signalReceived == false)
+			if ((poll(&_pollfd_list[i], _pollfd_list.size(), 0) == -1) && _signalReceived == false)
 			throw (std::runtime_error("Error: poll()"));
 			if (_pollfd_list[i].revents & POLLIN) {
 				if (_pollfd_list[i].fd == _serverSocket)
-				HandleNewClient();
+					HandleNewClient();
 				else
-				HandleReceivedData(_pollfd_list[i].fd);
-				
-				std::cout << "size pollfd = " << _pollfd_list.size() << "\n";
+					HandleReceivedData(_pollfd_list[i].fd);
+				}
 			}
-		}
 	}
 	closeSockets();
 }
 
 void	Server::closeSockets(void) {
-
-	std::cout << "call close Socket()\n";
-
 	for (size_t i = 0; i < _client_list.size(); ++i) {
 		std::cout << "closing client [" << _client_list[i].fd << "]\n";
 		close(_client_list[i].fd);
