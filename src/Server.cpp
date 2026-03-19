@@ -10,6 +10,7 @@
 #include <netdb.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <algorithm>
 
 bool Server::_signalReceived = false;
 
@@ -62,7 +63,7 @@ void	Server::init(uint16_t port) {
 }
 
 
-void	Server::HandleNewClient(void) {
+void	Server::_HandleNewClient(void) {
 	Client 			client;
 	int				clientFd;
 	sockaddr_in		clientAdd;
@@ -71,12 +72,12 @@ void	Server::HandleNewClient(void) {
 	
 	
 	clientAddLen = sizeof(clientAdd);
-	if ((clientFd = accept(_serverSocket, (struct sockaddr*)&clientAdd, &clientAddLen) == -1)) {
-		std::runtime_error("accept: Failed to create and connect client socket: " + std::string(strerror(errno)));
+	if ((clientFd = accept(_serverSocket, (struct sockaddr*)&clientAdd, &clientAddLen)) == -1) {
+		std::cerr << "accept: Failed to create and connect client socket: " + std::string(strerror(errno));
 		return ;
 	}
 	if (fcntl(clientFd, F_SETFL, O_NONBLOCK) == -1) {
-		std::runtime_error("fcntl: Failed to add optin O_NONBLOCK to client socket: " + std::string(strerror(errno)));
+		std::cerr << "fcntl: Failed to add optin O_NONBLOCK to client socket: " + std::string(strerror(errno));
 		return ;
 	}
 	newPollfd.fd = clientFd;
@@ -87,41 +88,88 @@ void	Server::HandleNewClient(void) {
 	client.connected = false;
 	_client_list[clientFd] = client;
 	_pollfd_list.push_back(newPollfd);
-	
-	
+
 	std::cout << "Client " << clientFd << " connected!\n";
-	std::cout << "port " << clientAdd.sin_port << "\n";
 	std::cout << "port " << client.ipAddr << "\n";
 }
 
-void	Server::HandleReceivedData(int clientSocket) {
+
+void	Server::_HandleReceivedData(int clientSocket) {
 	std::cout << "handleReceivedData: fd = " << clientSocket << "\n";
-	//TODO FRAMING, PARSING, EXECUTION, RESPONSE"
+	char	buffer[BUFFER_SIZE];
+	int		bytes;
+	Client	client;
+	
+	client = _client_list[clientSocket];
+	memset(buffer, 0, sizeof(buffer));
+	bytes = recv(clientSocket, buffer, sizeof(buffer), MSG_DONTWAIT);
+	if (bytes == 0) {
+		// end of line reached or client disconnected.
+		//TODO cleanup: remove the client from the channels where he is a member
+		close(_client_list[clientSocket].fd);
+		_client_list.erase(clientSocket);
+		for (size_t i = 0; i < _pollfd_list.size(); ++i) {
+			if (_pollfd_list[i].fd == clientSocket) {
+				_pollfd_list.erase(_pollfd_list.begin() + i);
+				break;
+			}
+		}
+		std::cout << "cleanup client [" << clientSocket << "]\n";
+		return ;
+	}
+	else if (bytes == -1) {
+		if (errno == EAGAIN || errno == EWOULDBLOCK) {
+			std::cout << "recv: " + std::string(strerror(errno));
+			return ;
+		}
+		else
+		{
+			std::cerr << "recv: " + std::string(strerror(errno));
+			return ;
+		}
+	}
+	if (buffer[0] == '\0'){
+		std::cout << "buffer is empty\n";
+	}
+	client.buffer_in = buffer;
+	// TODO: FRAMING /r/n and /n
+	// TODO: PARSING 
+	// TODO: VALIDATE COMBINAISON 
+	// TODO: EXECUTE 
+	// TODO: REPEAT 
+	
+	std::cout << "data received: buffer = |" << buffer << "|\n";
+}
+
+void	Server::_printClients(void) {
+	for (std::map<int, Client>::iterator it = _client_list.begin(); it != _client_list.end(); ++it)
+		std::cout << "client [" << it->first << "] connected at address [" << it->second.ipAddr << "]\n";	
 }
 
 void	Server::run(void) {
 	while (_signalReceived == false) {
-		for (size_t i = 0; i < _pollfd_list.size(); ++i) {
-			if ((poll(&_pollfd_list[i], _pollfd_list.size(), 0) == -1) && _signalReceived == false)
+		if ((poll(&_pollfd_list[0], _pollfd_list.size(), 0) == -1) && _signalReceived == false)
 			throw (std::runtime_error("Error: poll()"));
+		for (size_t i = 0; i < _pollfd_list.size(); ++i) {
 			if (_pollfd_list[i].revents & POLLIN) {
 				if (_pollfd_list[i].fd == _serverSocket)
-					HandleNewClient();
+					_HandleNewClient();
 				else
-					HandleReceivedData(_pollfd_list[i].fd);
-				}
+					_HandleReceivedData(_pollfd_list[i].fd);
 			}
+		}
 	}
 	closeSockets();
 }
 
 void	Server::closeSockets(void) {
 	for (size_t i = 0; i < _client_list.size(); ++i) {
-		std::cout << "closing client [" << _client_list[i].fd << "]\n";
+		std::cout << "cleanup client [" << _client_list[i].fd << "]\n";
 		close(_client_list[i].fd);
+		_client_list.erase(i);
 	}
 	if (_serverSocket != -1) {
-		std::cout << "closing Sever [" << _serverSocket << "]\n";
+		std::cout << "cleanup Sever [" << _serverSocket << "]\n";
 		close(_serverSocket);
 	}
 }

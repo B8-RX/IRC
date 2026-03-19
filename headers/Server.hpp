@@ -10,6 +10,7 @@
 #include <signal.h>
 #include "Client.hpp"
 #include <map>
+#define BUFFER_SIZE 1024
 
 // class Channel;
 
@@ -40,7 +41,8 @@ class Server {
 		int							_clientSocket;
 		sockaddr_in					_serverAddress;
 		int							_serverSocket;
-		void						HandleNewClient(void);
-		void						HandleReceivedData(int clientSocket);
+		void						_HandleNewClient(void);
+		void						_HandleReceivedData(int clientSocket);
+		void						_printClients(void);
 	};
 #endif // !SERVER_HPP
