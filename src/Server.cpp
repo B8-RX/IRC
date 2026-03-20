@@ -131,14 +131,22 @@ void	Server::_HandleReceivedData(int clientSocket) {
 	if (buffer[0] == '\0'){
 		std::cout << "buffer is empty\n";
 	}
-	client.buffer_in = buffer;
+	client.buffer_in.append(buffer, bytes);;
+	std::string	line;
+	size_t	posCRLF;
+	while ((posCRLF = client.buffer_in.find("\r\n")) != std::string::npos)
+	{
+		line = client.buffer_in.substr(0, posCRLF);
+		client.buffer_in.erase(0, posCRLF + 2);
+		std::cout << "line crfl: " << line << "\n";
+	}
 	// TODO: FRAMING /r/n and /n
 	// TODO: PARSING 
 	// TODO: VALIDATE COMBINAISON 
 	// TODO: EXECUTE 
 	// TODO: REPEAT 
-	
-	std::cout << "data received: buffer = |" << buffer << "|\n";
+	_client_list[clientSocket] = client;
+	// std::cout << "data received: buffer = |" << buffer << "|\n";
 }
 
 void	Server::_printClients(void) {

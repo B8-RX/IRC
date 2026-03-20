@@ -38,7 +38,6 @@ class Server {
 		// std::map<int, Channel>		_channel_list;
 		std::vector<struct pollfd>	_pollfd_list;
 		uint16_t					_port;
-		int							_clientSocket;
 		sockaddr_in					_serverAddress;
 		int							_serverSocket;
 		void						_HandleNewClient(void);
