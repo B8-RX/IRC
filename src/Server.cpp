@@ -140,9 +140,6 @@ void	Server::_HandleReceivedData(int clientSocket) {
 	size_t		posCRLF = std::string::npos;
 	std::vector<std::string>	vecLines;
 	std::string					line;
-	std::cout << "buffer_in [" << client.buffer_in << "]\n";
-	std::cout << "buffer_in.size() [" << client.buffer_in.size() << "]\n";
-
 	// FRAMING /r/n
 	while ((posCRLF = client.buffer_in.find("\r\n")) != std::string::npos) {
 			line = client.buffer_in.substr(0, posCRLF);
