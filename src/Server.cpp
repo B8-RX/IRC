@@ -1,5 +1,6 @@
 #include "Server.hpp"
 #include "Client.hpp"
+#include <string>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -95,17 +96,18 @@ void	Server::_HandleNewClient(void) {
 
 
 void	Server::_HandleReceivedData(int clientSocket) {
-	std::cout << "handleReceivedData: fd = " << clientSocket << "\n";
+	std::cout << "\n\nhandleReceivedData: fd = " << clientSocket << "\n";
 	char	buffer[BUFFER_SIZE];
-	int		bytes;
+	int		readBytes;
 	Client	client;
 	
 	client = _client_list[clientSocket];
 	memset(buffer, 0, sizeof(buffer));
-	bytes = recv(clientSocket, buffer, sizeof(buffer), MSG_DONTWAIT);
-	if (bytes == 0) {
+	readBytes = recv(clientSocket, buffer, sizeof(buffer), MSG_DONTWAIT);
+	if (readBytes == 0) {
 		// end of line reached or client disconnected.
 		//TODO cleanup: remove the client from the channels where he is a member
+		std::cout << "cleanup client [" << clientSocket << "]\n";
 		close(_client_list[clientSocket].fd);
 		_client_list.erase(clientSocket);
 		for (size_t i = 0; i < _pollfd_list.size(); ++i) {
@@ -114,10 +116,9 @@ void	Server::_HandleReceivedData(int clientSocket) {
 				break;
 			}
 		}
-		std::cout << "cleanup client [" << clientSocket << "]\n";
 		return ;
 	}
-	else if (bytes == -1) {
+	else if (readBytes == -1) {
 		if (errno == EAGAIN || errno == EWOULDBLOCK) {
 			std::cout << "recv: " + std::string(strerror(errno));
 			return ;
@@ -130,23 +131,26 @@ void	Server::_HandleReceivedData(int clientSocket) {
 	}
 	if (buffer[0] == '\0'){
 		std::cout << "buffer is empty\n";
+		return ;
+	// return ???? 
 	}
-	client.buffer_in.append(buffer, bytes);;
-	std::string	line;
-	size_t	posCRLF;
-	while ((posCRLF = client.buffer_in.find("\r\n")) != std::string::npos)
-	{
-		line = client.buffer_in.substr(0, posCRLF);
-		client.buffer_in.erase(0, posCRLF + 2);
-		std::cout << "line crfl: " << line << "\n";
+	client.buffer_in.append(buffer, readBytes);
+	
+	// aproche 1
+	size_t		posCRLF = std::string::npos;
+	std::vector<std::string>	vecLines;
+	std::string					line;
+	// FRAMING /r/n
+	while ((posCRLF = client.buffer_in.find("\r\n")) != std::string::npos) {
+			line = client.buffer_in.substr(0, posCRLF);
+			vecLines.push_back(line);
+			client.buffer_in.erase(0, posCRLF + 2);
 	}
-	// TODO: FRAMING /r/n and /n
 	// TODO: PARSING 
 	// TODO: VALIDATE COMBINAISON 
 	// TODO: EXECUTE 
 	// TODO: REPEAT 
 	_client_list[clientSocket] = client;
-	// std::cout << "data received: buffer = |" << buffer << "|\n";
 }
 
 void	Server::_printClients(void) {
