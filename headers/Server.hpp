@@ -23,7 +23,7 @@ class Server {
 		void	closeSockets(void);
 		class	ErrorException : public std::exception {
 			private:
-				std::string		_message;
+				std::string			_message;
 			public:
 				ErrorException(const std::string& message) : _message(message) {}
 				virtual ~ErrorException() throw() {}
@@ -35,21 +35,14 @@ class Server {
 		static bool					_signal_received;
 		std::map<int, Client>		_client_list; 
 		std::map<int, Channel>		_channel_list;
-		struct Line {
-			std::string					raw;
-			std::string					prefix; // (source) when message server-to-client (description about the message) may not be present 
-			std::string					command;
-			std::vector<std::string>	params; // strip ':'
-			std::size_t					size; // use MAX_SIZE_MSG to check/ERR_INPUTTOOLONG
-		};
-		std::vector<Line>			_vec_line;
 		std::vector<struct pollfd>	_pollfd_list;
 		uint16_t					_port;
 		sockaddr_in					_serverAddress;
 		int							_serverSocket;
-		void						_HandleNewClient(void);
-		void						_HandleReceivedData(int client_socket);
-		void						_makeCompleteLines(int client_socket);
+		void						_handleNewClient(void);
+		void						_handleReceivedData(int client_socket);
+		void						_handleCompleteLines(int client_socket);
+		void						_validateLines(int client_socket);
 		void						_printClients(void);
 	};
 #endif // !SERVER_HPP

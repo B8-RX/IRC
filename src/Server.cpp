@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <algorithm>
+#include <queue>
 
 bool Server::_signal_received = false;
 
@@ -65,7 +66,7 @@ void	Server::init(uint16_t port) {
 }
 
 
-void	Server::_HandleNewClient(void) {
+void	Server::_handleNewClient(void) {
 	Client 			client;
 	int				client_fd;
 	sockaddr_in		clientAdd;
@@ -92,12 +93,12 @@ void	Server::_HandleNewClient(void) {
 	_client_list[client_fd] = client;
 	_pollfd_list.push_back(newPollfd);
 
-	std::cout << "Client: [" << client_fd << "] connected!\n";
+	std::cout << "\nClient: [" << client_fd << "] connected!\n";
 	std::cout << "address: [" << client.ipAddr << "]\n";
 }
 
 
-void	Server::_HandleReceivedData(int clientSocket) {
+void	Server::_handleReceivedData(int clientSocket) {
 	std::cout << "\n\nFunction HandleReceivedData: fd = " << clientSocket << "\n";
 	char	buffer[BUFFER_SIZE];
 	int		readBytes;
@@ -135,20 +136,19 @@ void	Server::_HandleReceivedData(int clientSocket) {
 	} // ! maybe redondant with readBytes == -1 ??
 
 	_client_list[clientSocket].buffer_in.append(buffer, readBytes);
-	_makeCompleteLines(clientSocket);
+	_handleCompleteLines(clientSocket);
 	
+	// TODO: FRAMING 
 	// TODO: PARSING 
-	
 	// TODO: VALIDATE COMBINAISON 
 	// TODO: EXECUTE 
 	// TODO: REPEAT 
 	// _client_list[clientSocket] = client;
 }
 
-void	Server::_makeCompleteLines(int client_socket) {
+void	Server::_handleCompleteLines(int client_socket) {
 
-	std::vector<std::string>	vecLines;
-	std::string					line;
+	struct Client::s_Line		line;
 	size_t						posCRLF = std::string::npos;
 	Client						client;
 
@@ -156,11 +156,16 @@ void	Server::_makeCompleteLines(int client_socket) {
 	// FRAMING (split by each complete lines /r/n ) 
 	// aproche 1 (std::string::find())
 	while ((posCRLF = client.buffer_in.find("\r\n")) != std::string::npos) {
-			line = client.buffer_in.substr(0, posCRLF);
-			vecLines.push_back(line);
+			line.raw = client.buffer_in.substr(0, posCRLF);
+			client._queue.push(line);
 			client.buffer_in.erase(0, posCRLF + 2);
 	}
 	_client_list[client_socket] = client;
+}
+
+
+void	Server::_validateLines(int client_socket) {
+	// TODO: Implement line validation logic
 }
 
 void	Server::_printClients(void) {
@@ -175,9 +180,9 @@ void	Server::run(void) {
 		for (size_t i = 0; i < _pollfd_list.size(); ++i) {
 			if (_pollfd_list[i].revents & POLLIN) {
 				if (_pollfd_list[i].fd == _serverSocket)
-					_HandleNewClient();
+					_handleNewClient();
 				else
-					_HandleReceivedData(_pollfd_list[i].fd);
+					_handleReceivedData(_pollfd_list[i].fd);
 			}
 		}
 	}
