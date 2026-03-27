@@ -32,6 +32,12 @@ class Server {
 				}
 		};
 	private:
+		struct s_Line {
+			std::string					raw;
+			std::string					prefix;
+			std::string					command;
+			std::vector<std::string>	params;
+		};
 		static bool					_signalReceived;
 		std::map<int, Client>		_clientList; 
 		std::map<int, Channel>		_channelList;
@@ -42,7 +48,7 @@ class Server {
 		void						_handleNewClient(void);
 		void						_handleReceivedData(int client_socket);
 		std::vector<std::string>	_splitCRLF(int client_socket);
-		void						_validateLines(const std::vector<std::string>& v_line, int client_fd);
+		void						_parseLine(const std::string& line, struct s_Line sLine);
 		void						_printClients(void);
 	};
 #endif // !SERVER_HPP

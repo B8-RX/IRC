@@ -136,14 +136,21 @@ void	Server::_handleReceivedData(int clientFd) {
 	} // ! maybe redondant with readBytes == -1 ??
 
 	_clientList[clientFd].bufferIn.append(buffer, readBytes);
-	_validateLines(_splitCRLF(clientFd), clientFd);
+	
+	std::vector<std::string>	vLines = _splitCRLF(clientFd);
+	struct s_Line	sLine;
+
+	sLine.raw = _clientList[clientFd].bufferIn;
+	for (std::size_t i = 0; i < vLines.size(); ++i) {
+		_parseLine(vLines[i], sLine);
+	}
+	std::cout << "bufferIn :[" << sLine.raw << "]\n";
 	
 	// TODO: FRAMING 
 	// TODO: PARSING 
 	// TODO: VALIDATE COMBINAISON 
 	// TODO: EXECUTE 
 	// TODO: REPEAT 
-	// _clientList[clientFd] = client;
 }
 
 std::vector<std::string>	Server::_splitCRLF(int clientFd) {
@@ -151,28 +158,39 @@ std::vector<std::string>	Server::_splitCRLF(int clientFd) {
 	std::vector<std::string>	vLines;
 	std::string					line;
 	size_t						posCRLF = std::string::npos;
-	Client						client;
+	Client*						client;
 
-	client = _clientList[clientFd];
+	client = &_clientList[clientFd];
 	// FRAMING (split by each complete lines /r/n ) 
 	// aproche 1 (std::string::find())
-	while ((posCRLF = client.bufferIn.find("\r\n")) != std::string::npos) {
-			line = client.bufferIn.substr(0, posCRLF);
+	while ((posCRLF = client->bufferIn.find("\r\n")) != std::string::npos) {
+			line = client->bufferIn.substr(0, posCRLF);
 			vLines.push_back(line);
-			client.bufferIn.erase(0, posCRLF + 2);
+			client->bufferIn.erase(0, posCRLF + 2);
 	}
-	_clientList[clientFd] = client;
 	return (vLines);
 }
 
 
-void	Server::_validateLines(const std::vector<std::string>& vLines, int clientFd) {
+void	Server::_parseLine(const std::string& line, struct s_Line sLine) {
 	// TODO: Implement line validation logic
 
-	for(std::size_t i = 0; i < vLines.size(); ++i) {
-		std::cout << "[" << vLines[i] << "]\n";
-	}
-	std::cout << "bufferIn :[" << _clientList[clientFd].bufferIn << "]\n";
+	std::cout << "line: [" << line << "]\n";
+
+	// check if the first character is a tag ('@') not supported because it is enable with capability
+	//	 if found tag i must ignore silently or send error ?? 
+	// detect prefix/source (if the first character is ':') store the token as prefix/source
+	// store the next token as the commande
+	/* check if there is a trailing character (':')
+		 if yes
+			split at the trailing
+			split on each space and on an array push back the word
+			push back the second part without spliting
+		else
+			split on each space and on an array push back the word
+
+	 */		
+
 }
 
 void	Server::_printClients(void) {
