@@ -15,7 +15,7 @@
 #include <algorithm>
 #include <queue>
 
-bool Server::_signal_received = false;
+bool Server::_signalReceived = false;
 
 Server::Server(void) {}
 
@@ -60,7 +60,7 @@ void	Server::init(uint16_t port) {
 	pollfd.fd = _serverSocket;
 	pollfd.events = POLLIN;
 	pollfd.revents = 0;
-	_pollfd_list.push_back(pollfd);
+	_pollfdList.push_back(pollfd);
 	std::cout << "server initialized successfully.\n"
 				<< "Port: " << _port << "\n";
 }
@@ -68,52 +68,52 @@ void	Server::init(uint16_t port) {
 
 void	Server::_handleNewClient(void) {
 	Client 			client;
-	int				client_fd;
+	int				clientFd;
 	sockaddr_in		clientAdd;
 	socklen_t		clientAddLen;
 	struct	pollfd	newPollfd;
 	
 	
 	clientAddLen = sizeof(clientAdd);
-	client_fd = accept(_serverSocket, (struct sockaddr*)&clientAdd, &clientAddLen);
-	if (client_fd == -1) {
+	clientFd = accept(_serverSocket, (struct sockaddr*)&clientAdd, &clientAddLen);
+	if (clientFd == -1) {
 		std::cerr << "accept: Failed to create and connect client socket: " + std::string(strerror(errno));
 		return ;
 	}
-	if (fcntl(client_fd, F_SETFL, O_NONBLOCK) == -1) {
+	if (fcntl(clientFd, F_SETFL, O_NONBLOCK) == -1) {
 		std::cerr << "fcntl: Failed to add optin O_NONBLOCK to client socket: " + std::string(strerror(errno));
 		return ;
 	}
-	newPollfd.fd = client_fd;
+	newPollfd.fd = clientFd;
 	newPollfd.events = POLLIN;
 	newPollfd.revents = 0;
-	client.fd = client_fd;
+	client.fd = clientFd;
 	client.ipAddr = inet_ntoa(clientAdd.sin_addr);
 	client.connected = false;
-	_client_list[client_fd] = client;
-	_pollfd_list.push_back(newPollfd);
+	_clientList[clientFd] = client;
+	_pollfdList.push_back(newPollfd);
 
-	std::cout << "\nClient: [" << client_fd << "] connected!\n";
+	std::cout << "\nClient: [" << clientFd << "] connected!\n";
 	std::cout << "address: [" << client.ipAddr << "]\n";
 }
 
 
-void	Server::_handleReceivedData(int clientSocket) {
-	std::cout << "\n\nFunction HandleReceivedData: fd = " << clientSocket << "\n";
+void	Server::_handleReceivedData(int clientFd) {
+	std::cout << "\n\nFunction HandleReceivedData: fd = " << clientFd << "\n";
 	char	buffer[BUFFER_SIZE];
 	int		readBytes;
 
 	memset(buffer, 0, sizeof(buffer));
-	readBytes = recv(clientSocket, buffer, sizeof(buffer), MSG_DONTWAIT);
+	readBytes = recv(clientFd, buffer, sizeof(buffer), MSG_DONTWAIT);
 	if (readBytes == 0) {
 		//INFO end of line reached or client disconnected. cleanup...
 		//TODO cleanup: remove the client from the channels where he is a member
-		std::cout << "cleanup client [" << clientSocket << "]\n";
-		close(_client_list[clientSocket].fd);
-		_client_list.erase(clientSocket);
-		for (size_t i = 0; i < _pollfd_list.size(); ++i) {
-			if (_pollfd_list[i].fd == clientSocket) {
-				_pollfd_list.erase(_pollfd_list.begin() + i);
+		std::cout << "cleanup client [" << clientFd << "]\n";
+		close(_clientList[clientFd].fd);
+		_clientList.erase(clientFd);
+		for (size_t i = 0; i < _pollfdList.size(); ++i) {
+			if (_pollfdList[i].fd == clientFd) {
+				_pollfdList.erase(_pollfdList.begin() + i);
 				break;
 			}
 		}
@@ -135,54 +135,61 @@ void	Server::_handleReceivedData(int clientSocket) {
 		return ;
 	} // ! maybe redondant with readBytes == -1 ??
 
-	_client_list[clientSocket].buffer_in.append(buffer, readBytes);
-	_handleCompleteLines(clientSocket);
+	_clientList[clientFd].bufferIn.append(buffer, readBytes);
+	_validateLines(_splitCRLF(clientFd), clientFd);
 	
 	// TODO: FRAMING 
 	// TODO: PARSING 
 	// TODO: VALIDATE COMBINAISON 
 	// TODO: EXECUTE 
 	// TODO: REPEAT 
-	// _client_list[clientSocket] = client;
+	// _clientList[clientFd] = client;
 }
 
-void	Server::_handleCompleteLines(int client_socket) {
+std::vector<std::string>	Server::_splitCRLF(int clientFd) {
 
-	struct Client::s_Line		line;
+	std::vector<std::string>	vLines;
+	std::string					line;
 	size_t						posCRLF = std::string::npos;
 	Client						client;
 
-	client = _client_list[client_socket];
+	client = _clientList[clientFd];
 	// FRAMING (split by each complete lines /r/n ) 
 	// aproche 1 (std::string::find())
-	while ((posCRLF = client.buffer_in.find("\r\n")) != std::string::npos) {
-			line.raw = client.buffer_in.substr(0, posCRLF);
-			client._queue.push(line);
-			client.buffer_in.erase(0, posCRLF + 2);
+	while ((posCRLF = client.bufferIn.find("\r\n")) != std::string::npos) {
+			line = client.bufferIn.substr(0, posCRLF);
+			vLines.push_back(line);
+			client.bufferIn.erase(0, posCRLF + 2);
 	}
-	_client_list[client_socket] = client;
+	_clientList[clientFd] = client;
+	return (vLines);
 }
 
 
-void	Server::_validateLines(int client_socket) {
+void	Server::_validateLines(const std::vector<std::string>& vLines, int clientFd) {
 	// TODO: Implement line validation logic
+
+	for(std::size_t i = 0; i < vLines.size(); ++i) {
+		std::cout << "[" << vLines[i] << "]\n";
+	}
+	std::cout << "bufferIn :[" << _clientList[clientFd].bufferIn << "]\n";
 }
 
 void	Server::_printClients(void) {
-	for (std::map<int, Client>::iterator it = _client_list.begin(); it != _client_list.end(); ++it)
+	for (std::map<int, Client>::iterator it = _clientList.begin(); it != _clientList.end(); ++it)
 		std::cout << "client [" << it->first << "] connected at address [" << it->second.ipAddr << "]\n";	
 }
 
 void	Server::run(void) {
-	while (_signal_received == false) {
-		if ((poll(&_pollfd_list[0], _pollfd_list.size(), 0) == -1) && _signal_received == false)
+	while (_signalReceived == false) {
+		if ((poll(&_pollfdList[0], _pollfdList.size(), 0) == -1) && _signalReceived == false)
 			throw (std::runtime_error("Error: poll()"));
-		for (size_t i = 0; i < _pollfd_list.size(); ++i) {
-			if (_pollfd_list[i].revents & POLLIN) {
-				if (_pollfd_list[i].fd == _serverSocket)
+		for (size_t i = 0; i < _pollfdList.size(); ++i) {
+			if (_pollfdList[i].revents & POLLIN) {
+				if (_pollfdList[i].fd == _serverSocket)
 					_handleNewClient();
 				else
-					_handleReceivedData(_pollfd_list[i].fd);
+					_handleReceivedData(_pollfdList[i].fd);
 			}
 		}
 	}
@@ -190,15 +197,15 @@ void	Server::run(void) {
 }
 
 void	Server::closeSockets(void) {
-	std::map<int, Client>::iterator it = _client_list.begin();
-	for (size_t i = 0; i < _client_list.size(); ++i, ++it) {
+	std::map<int, Client>::iterator it = _clientList.begin();
+	for (size_t i = 0; i < _clientList.size(); ++i, ++it) {
 		std::cout << "cleanup client [" << it->second.fd << "]\n";
 		close(it->second.fd);
 	}
-	for (size_t i  = 0; i < _channel_list.size(); ++i) {
-		std::cout << "cleanup channel [" << _channel_list[i].fd << "]\n";
-		close(_channel_list[i].fd);
-		_channel_list.erase(i);
+	for (size_t i  = 0; i < _channelList.size(); ++i) {
+		std::cout << "cleanup channel [" << _channelList[i].fd << "]\n";
+		close(_channelList[i].fd);
+		_channelList.erase(i);
 	}
 	if (_serverSocket != -1) {
 		std::cout << "cleanup Sever [" << _serverSocket << "]\n";
@@ -214,5 +221,5 @@ void Server::sighandler(int signum) {
 	std::cout << "Ctrl+\\\n";
 	else
 	std::cout << "Unknown signal: " << signum << "\n";
-	_signal_received = true;
+	_signalReceived = true;
 }

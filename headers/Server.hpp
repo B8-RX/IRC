@@ -32,17 +32,17 @@ class Server {
 				}
 		};
 	private:
-		static bool					_signal_received;
-		std::map<int, Client>		_client_list; 
-		std::map<int, Channel>		_channel_list;
-		std::vector<struct pollfd>	_pollfd_list;
+		static bool					_signalReceived;
+		std::map<int, Client>		_clientList; 
+		std::map<int, Channel>		_channelList;
+		std::vector<struct pollfd>	_pollfdList;
 		uint16_t					_port;
 		sockaddr_in					_serverAddress;
 		int							_serverSocket;
 		void						_handleNewClient(void);
 		void						_handleReceivedData(int client_socket);
-		void						_handleCompleteLines(int client_socket);
-		void						_validateLines(int client_socket);
+		std::vector<std::string>	_splitCRLF(int client_socket);
+		void						_validateLines(const std::vector<std::string>& v_line, int client_fd);
 		void						_printClients(void);
 	};
 #endif // !SERVER_HPP
