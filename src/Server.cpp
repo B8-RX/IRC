@@ -137,10 +137,15 @@ void	Server::_handleReceivedData(int clientFd) {
 
 	_clientList[clientFd].bufferIn.append(buffer, readBytes);
 	
-	std::vector<std::string>	vLines = _splitCRLF(clientFd);
-	struct s_Line	sLine;
-
+	struct s_Line				sLine;
+	std::vector<std::string>	vLines;
+	
+	// store the full client input
 	sLine.raw = _clientList[clientFd].bufferIn;
+
+	// split by \r\n to store complete lines in vector
+	vLines = _splitCRLF(clientFd);
+	
 	for (std::size_t i = 0; i < vLines.size(); ++i) {
 		_parseLine(vLines[i], sLine);
 	}
@@ -162,7 +167,6 @@ std::vector<std::string>	Server::_splitCRLF(int clientFd) {
 
 	client = &_clientList[clientFd];
 	// FRAMING (split by each complete lines /r/n ) 
-	// aproche 1 (std::string::find())
 	while ((posCRLF = client->bufferIn.find("\r\n")) != std::string::npos) {
 			line = client->bufferIn.substr(0, posCRLF);
 			vLines.push_back(line);
@@ -171,30 +175,86 @@ std::vector<std::string>	Server::_splitCRLF(int clientFd) {
 	return (vLines);
 }
 
+std::string	Server::_spaceTrim(const std::string& str) const {
+	std::string	trimmed = str.substr(0);
+	std::size_t i = 0;
+
+	for (; i < trimmed.size(); ++i) {
+		if (trimmed[i] != ' ')
+			break;
+	}
+	trimmed.erase(0, i);
+	for (i = trimmed.size(); i > 0; --i) {
+		if (trimmed[i] != ' ')
+			break;
+	}
+	std::string	res = trimmed.substr(0, i);
+	return (res);
+}
 
 void	Server::_parseLine(const std::string& line, struct s_Line sLine) {
 	// TODO: Implement line validation logic
 
 	std::cout << "line: [" << line << "]\n";
+	(void)sLine;
+	// if the line is empty, ignore it
+	// if the line start with ':' extract the token as prefix/source
+	// extract the next token as command
+	// split by spaces
+	// while token[0] != ':' push_back the tokens in params[]
+	// if found colon (':') find position of the colon and push_back form (posColon + 1) to line.end() in params() and stop parsing after that parameter.
+	if (line.empty())
+		return;
+	std::string	lineCpy = _spaceTrim(line.substr(0));
+	// std::cout << "test trim: [" << lineCpy << "]\n";
+	
+	std::size_t i;
 
-	// check if the first character is a tag ('@') not supported because it is enable with capability
-	//	 if found tag i must ignore silently or send error ?? 
-	// detect prefix/source (if the first character is ':') store the token as prefix/source
-	// store the next token as the commande
-	/* check if there is a trailing character (':')
-		 if yes
-			split at the trailing
-			split on each space and on an array push back the word
-			push back the second part without spliting
-		else
-			split on each space and on an array push back the word
+	if (lineCpy[0] == ':') {
+		for (std::size_t j = 0; j < lineCpy.size(); ++j) {
+			if (lineCpy[j] == ' ') {
+				sLine.prefix = lineCpy.substr(0, j);
+				break;
+			}
+		}
+		i = sLine.prefix.size();
+	}
+	else {
+		for (std::size_t j = 0; j < lineCpy.size(); ++j) {
+			if (lineCpy[j] == ' ') {
+				sLine.command = lineCpy.substr(0, j);
+				break;
+			}
+		}
+		i = sLine.command.size();
+	}
+	for (; i < lineCpy.size(); ++i) {
+		if (lineCpy[i] == ':')
+				sLine.params.push_back(_spaceTrim(lineCpy.substr(i)));
+		else {
+			for (std::size_t j = 0; (j + i) < lineCpy.size(); ++j) {
+				if (lineCpy[j + i] == ' ') {
+					sLine.params.push_back(_spaceTrim(lineCpy.substr(i, j + i)));
+					i += j;
+					break;
+				}
+			}
+		}
+	}
 
-	 */		
+	std::cout << "prefix: [" << (sLine.prefix.empty() ? "" : sLine.prefix) << "]\n";
+
+	std::cout << "command: [" << (sLine.command.empty() ? "" : sLine.command) << "]\n";
+
+	std::cout << "params: \n";
+	for (std::size_t i = 0; i < sLine.params.size(); ++i) {
+		std::cout << "[" << sLine.params[i] << "]\n";
+	}
 
 }
 
-void	Server::_printClients(void) {
-	for (std::map<int, Client>::iterator it = _clientList.begin(); it != _clientList.end(); ++it)
+void	Server::_printClients(void) const {
+	for (std::map<int, Client>::const_iterator it = _clientList.begin(); it != _clientList.end(); ++it)
 		std::cout << "client [" << it->first << "] connected at address [" << it->second.ipAddr << "]\n";	
 }
 
