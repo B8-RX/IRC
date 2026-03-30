@@ -140,19 +140,17 @@ void	Server::_handleReceivedData(int clientFd) {
 	struct s_Line				sLine;
 	std::vector<std::string>	vLines;
 	
-	// store the full client input
-	sLine.raw = _clientList[clientFd].bufferIn;
-
-	// split by \r\n to store complete lines in vector
-	vLines = _splitCRLF(clientFd);
+	sLine.raw = _clientList[clientFd].bufferIn.substr(0); // store raw client input
+	vLines = _splitCRLF(clientFd); // extract complete lines
 	
 	for (std::size_t i = 0; i < vLines.size(); ++i) {
 		_parseLine(vLines[i], sLine);
 	}
-	std::cout << "bufferIn :[" << sLine.raw << "]\n";
-	
-	// TODO: FRAMING 
-	// TODO: PARSING 
+
+	std::cout << "buffer_in: [" << _clientList[clientFd].bufferIn << "]\n";
+
+	/* TODO: FRAMING */ //!done 
+	/* TODO: PARSING */ //? in progress
 	// TODO: VALIDATE COMBINAISON 
 	// TODO: EXECUTE 
 	// TODO: REPEAT 
@@ -166,7 +164,6 @@ std::vector<std::string>	Server::_splitCRLF(int clientFd) {
 	Client*						client;
 
 	client = &_clientList[clientFd];
-	// FRAMING (split by each complete lines /r/n ) 
 	while ((posCRLF = client->bufferIn.find("\r\n")) != std::string::npos) {
 			line = client->bufferIn.substr(0, posCRLF);
 			vLines.push_back(line);
@@ -184,73 +181,87 @@ std::string	Server::_spaceTrim(const std::string& str) const {
 			break;
 	}
 	trimmed.erase(0, i);
-	for (i = trimmed.size(); i > 0; --i) {
-		if (trimmed[i] != ' ')
+	for (i = (trimmed.size() - 1); i > 0; --i) {
+		if (trimmed[i] != ' ') 
 			break;
 	}
-	std::string	res = trimmed.substr(0, i);
+	std::string	res = trimmed.substr(0, (i + 1));
 	return (res);
 }
 
 void	Server::_parseLine(const std::string& line, struct s_Line sLine) {
-	// TODO: Implement line validation logic
-
-	std::cout << "line: [" << line << "]\n";
-	(void)sLine;
-	// if the line is empty, ignore it
-	// if the line start with ':' extract the token as prefix/source
-	// extract the next token as command
-	// split by spaces
-	// while token[0] != ':' push_back the tokens in params[]
-	// if found colon (':') find position of the colon and push_back form (posColon + 1) to line.end() in params() and stop parsing after that parameter.
 	if (line.empty())
 		return;
 	std::string	lineCpy = _spaceTrim(line.substr(0));
-	// std::cout << "test trim: [" << lineCpy << "]\n";
-	
-	std::size_t i;
+	std::string token;
 
-	if (lineCpy[0] == ':') {
+	if (lineCpy[0] == ':') { // skip ':' and store prefix
 		for (std::size_t j = 0; j < lineCpy.size(); ++j) {
 			if (lineCpy[j] == ' ') {
-				sLine.prefix = lineCpy.substr(0, j);
+				sLine.prefix = lineCpy.substr(1, j); 
+				token = sLine.prefix;
 				break;
 			}
 		}
-		i = sLine.prefix.size();
 	}
 	else {
-		for (std::size_t j = 0; j < lineCpy.size(); ++j) {
+		for (std::size_t j = 0; j < lineCpy.size(); ++j) { // store command
 			if (lineCpy[j] == ' ') {
-				sLine.command = lineCpy.substr(0, j);
+				sLine.command = lineCpy.substr(0, j); 
+				token = sLine.command;
 				break;
 			}
 		}
-		i = sLine.command.size();
 	}
-	for (; i < lineCpy.size(); ++i) {
-		if (lineCpy[i] == ':')
-				sLine.params.push_back(_spaceTrim(lineCpy.substr(i)));
-		else {
+	lineCpy.erase(0, token.size());
+	std::size_t i = 0;
+	while (i < lineCpy.size()) { // skip spaces
+		if (lineCpy[i] == ' ') {
 			for (std::size_t j = 0; (j + i) < lineCpy.size(); ++j) {
-				if (lineCpy[j + i] == ' ') {
-					sLine.params.push_back(_spaceTrim(lineCpy.substr(i, j + i)));
-					i += j;
+				if (lineCpy[j + i] != ' ') {
+					lineCpy.erase(i, j); 
+					i = 0;
 					break;
 				}
 			}
 		}
+		if (lineCpy[i] == ':') { // store trailing param
+			token = lineCpy.substr(1);
+			sLine.params.push_back(token); 
+			lineCpy.erase(0, token.size() + 1);
+			break ;
+		}
+		else {
+			std::size_t j = i;
+			while (j < lineCpy.size()) {  // store simple param
+				if (lineCpy[j] == ' ' || (j + 1) == lineCpy.size()) {
+					if ((j + 1) == lineCpy.size())
+						j++; 
+					token = lineCpy.substr(i, j);
+					sLine.params.push_back(token);
+					lineCpy.erase(i, j);
+					i = 0;
+					break;
+				}
+				++j;
+			}
+			if (j >= lineCpy.size())
+				i = j;
+		}
+
 	}
+
+	std::cout << "raw line: [" << sLine.raw << "]\n";
 
 	std::cout << "prefix: [" << (sLine.prefix.empty() ? "" : sLine.prefix) << "]\n";
 
 	std::cout << "command: [" << (sLine.command.empty() ? "" : sLine.command) << "]\n";
-
-	std::cout << "params: \n";
+	
 	for (std::size_t i = 0; i < sLine.params.size(); ++i) {
-		std::cout << "[" << sLine.params[i] << "]\n";
+		std::cout << "param:[" << sLine.params[i] << "]\n";
 	}
-
+	
+	std::cout << "\n";
 }
 
 void	Server::_printClients(void) const {
