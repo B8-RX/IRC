@@ -18,10 +18,15 @@ class Client {
 	std::string     		        ipAddr;
 	std::string     		        bufferIn;
 	std::string     		        bufferOut;
-	std::string             		nickname;
-	std::string             		username;
-	bool                    		connected;
-	std::map<int, Channel>  		channels;
+	
+private:
+	std::string             		_nickname;
+	bool							_hasNick;
+	std::string             		_username;
+	bool							_hasUser;
+	bool							_passAccepted;
+	bool                    		_registered;
+	std::map<int, Channel>  		_channels;
  };
 
 #endif // !CLIENT_HPP

@@ -89,7 +89,6 @@ void	Server::_handleNewClient(void) {
 	newPollfd.revents = 0;
 	client.fd = clientFd;
 	client.ipAddr = inet_ntoa(clientAdd.sin_addr);
-	client.connected = false;
 	_clientList[clientFd] = client;
 	_pollfdList.push_back(newPollfd);
 
