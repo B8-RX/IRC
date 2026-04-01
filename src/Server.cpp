@@ -151,7 +151,7 @@ void	Server::_handleReceivedData(int clientFd) {
 	// TODO: REPEAT 
 }
 
-bool	Server::_validateLine(struct s_Line& sLine) const {
+bool	Server::_validateLine(const s_Line& sLine) const {
 	std::cout << "raw line: [" << sLine.raw << "]\n";
 	std::cout << "prefix: [" << (sLine.prefix.empty() ? "" : sLine.prefix) << "]\n";
 	std::cout << "command: [" << (sLine.command.empty() ? "" : sLine.command) << "]\n";		
@@ -203,12 +203,12 @@ Server::s_Line	Server::_parseLine(const std::string& line) {
 		return (sLine);
 	std::string					lineCpy = _spaceTrim(line.substr(0));
 	
-	sLine.raw = line;
+	sLine.raw = lineCpy;
 	if (lineCpy[0] == ':') {
 		for (std::size_t j = 0; j < lineCpy.size(); ++j) {
 			if (lineCpy[j] == ' ' || j == (lineCpy.size() - 1)) {
 				if (lineCpy[j] != ' ') {
-					sLine.prefix = lineCpy.substr(0, j + 1);
+					sLine.prefix = lineCpy.substr(1, j);
 					return (sLine);
 				}
 				sLine.prefix = lineCpy.substr(0, j);
@@ -235,8 +235,12 @@ Server::s_Line	Server::_parseLine(const std::string& line) {
 	}
 	for (std::size_t i = 0; i < lineCpy.size(); ++i) {
 		if (lineCpy[i] == ' ' || (i == lineCpy.size() - 1)) {
-			if (lineCpy[i] != ' ') {
+			if (lineCpy[i] != ' ' && lineCpy[0] != ':') {
 				sLine.params.push_back(lineCpy.substr(0, i + 1));
+				return (sLine);
+			}
+			if (lineCpy[0] == ':') {
+				sLine.params.push_back(lineCpy.substr(1, lineCpy.size() - 1));
 				return (sLine);
 			}
 			sLine.params.push_back(lineCpy.substr(0, i));
@@ -244,10 +248,6 @@ Server::s_Line	Server::_parseLine(const std::string& line) {
 				++i;
 			lineCpy.erase(0, i);
 			i = 0;
-		}
-		if (lineCpy[i] == ':') {
-			sLine.params.push_back(lineCpy.substr(1, lineCpy.size() - 1));
-			break;
 		}
 	}
 	return (sLine);

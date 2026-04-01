@@ -49,7 +49,7 @@ class Server {
 		void						_handleReceivedData(int client_socket);
 		std::vector<std::string>	_splitCRLF(int client_socket);
 		struct s_Line				_parseLine(const std::string& line);
-		bool						_validateLine(struct s_Line& sLine) const;
+		bool						_validateLine(const s_Line& sLine) const;
 		void						_printClients(void) const;
 		std::string					_spaceTrim(const std::string& line) const;
 	};
