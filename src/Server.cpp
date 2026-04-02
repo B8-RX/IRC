@@ -21,10 +21,14 @@ Server::Server(void) {}
 
 Server::~Server(void) {}
 
-void	Server::init(uint16_t port) {
+void	Server::init(uint16_t port, const std::string& password) {
 	struct pollfd	pollfd;
 	_port = port;
-	
+
+	//* set password state
+	_password = password;
+	_passwordEnabled = !(_password.empty());
+
 	//* create socket internet
 	if ((_serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
 		throw (std::runtime_error("socket: Failed to create socket: " + std::string(strerror(errno))));
@@ -144,8 +148,8 @@ void	Server::_handleReceivedData(int clientFd) {
 	std::cout << "buffer_in: [" << _clientList[clientFd].bufferIn << "]\n";
 
 	/* TODO: FRAMING */ //!done 
-	/* TODO: PARSING */ //? in progress
-	// TODO: VALIDATE COMBINAISON 
+	/* TODO: PARSING */ //!done
+	/* TODO: VALIDATE COMBINAISON */ //? in progress
 	// TODO: EXECUTE 
 	// TODO: REPEAT 
 }
@@ -158,6 +162,40 @@ bool	Server::_validateLine(const s_Line& sLine) const {
 		std::cout << "param:[" << sLine.params[i] << "]\n";
 	}		
 	std::cout << "\n";
+
+	// TODO check if command is supported
+	// TODO check if params are good
+	// TODO check if registered is needed
+
+	/*
+		COMMANDS ARRAY
+
+			 PASS
+	- nb params = 1
+	- pre-register allowed = yes
+
+			 NICK
+	- nb params = 1
+	- pre-register allowed = yes
+
+			 USER
+	- nb params = 4
+	- pre-register allowed = yes
+
+				QUIT
+	- nb params = *
+	- pre-register allowed = yes
+
+	/////////////////////////////////////////////////////////
+
+			 JOIN
+	- nb params = 1
+	- pre-register allowed = no
+
+
+
+
+	*/
 	return (true);
 }
 
@@ -326,4 +364,39 @@ void Server::sighandler(int signum) {
 	else
 	std::cout << "Unknown signal: " << signum << "\n";
 	_signalReceived = true;
+}
+void	Server::_dispatchCommand(int clientFd, s_Line& line) {
+	(void)clientFd;
+	(void)line;
+}
+void	Server::_handlePass(int clientFd, s_Line& line) {
+	(void)clientFd;
+	(void)line;
+}
+void	Server::_handleNick(int clientFd, s_Line& line) {
+	(void)clientFd;
+	(void)line;
+}
+void	Server::_handleUser(int clientFd, s_Line& line) {
+	(void)clientFd;
+	(void)line;
+}
+void	Server::_handleJoin(int clientFd, s_Line& line) {
+	(void)clientFd;
+	(void)line;
+}
+void	Server::_handlePrivmsg(int clientFd, s_Line& line) {
+	(void)clientFd;
+	(void)line;
+}
+void	Server::_handlePart(int clientFd, s_Line& line) {
+	(void)clientFd;
+	(void)line;
+}
+void	Server::_handleQuit(int clientFd, s_Line& line) {
+	(void)clientFd;
+	(void)line;
+}
+void	Server::_cleanupClient(int clientFd) {
+	(void)clientFd;
 }

@@ -33,6 +33,7 @@ private:
 	std::string             		_nickname;
 	bool							_hasNick;
 	std::string             		_username;
+	std::string						_realName;
 	bool							_hasUser;
 	bool							_passAccepted;
 	bool                    		_registered;

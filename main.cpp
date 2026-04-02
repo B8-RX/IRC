@@ -18,8 +18,8 @@
 #include <cstring>
 
 int	main(int argc, char **argv) {
-	if (argc != 2) {
-		std::cerr << "Usage: " << argv[0] << " <port>\n";
+	if (argc != 2 && argc != 3) {
+		std::cerr << "Usage: " << argv[0] << " <port> <password>(optional)\n";
 		return (1);
 	}
 /*!
@@ -61,7 +61,10 @@ int	main(int argc, char **argv) {
  * @brief Initialize the server
  * @param port The port number to listen on
  */
-	myServer.init(port);
+
+	std::string password;
+	password = (argc == 3) ? argv[2] : ""; 
+	myServer.init(port, password);
 	myServer.run();
 	} catch (std::exception& e) {
 		std::cerr << e.what() << "\n";

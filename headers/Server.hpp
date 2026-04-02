@@ -18,7 +18,7 @@ class Server {
 		Server(void);
 		~Server(void);
 		static void	sighandler(int signum);
-		void	init(uint16_t port);
+		void	init(uint16_t port, const std::string& password);
 		void	run(void);
 		void	closeSockets(void);
 		class	ErrorException : public std::exception {
@@ -32,29 +32,52 @@ class Server {
 				}
 		};
 	private:
+		static bool					_signalReceived;
+		std::string					_password;
+		bool						_passwordEnabled;
+		// structures metier
 		struct s_Line {
 			std::string					raw;
 			std::string					prefix;
 			std::string					command;
 			std::vector<std::string>	params;
 		};
-		static bool					_signalReceived;
 		std::map<int, Client>		_clientList; 
 		std::map<int, Channel>		_channelList;
-		std::vector<struct pollfd>	_pollfdList;
+
+		// reseau
 		uint16_t					_port;
+		std::vector<struct pollfd>	_pollfdList;
 		sockaddr_in					_serverAddress;
 		int							_serverSocket;
 		void						_handleNewClient(void);
-		void						_handleReceivedData(int client_socket);
-		std::vector<std::string>	_splitCRLF(int client_socket);
+		void						_handleReceivedData(int clientFd);
+		void						_cleanupClient(int clinetFd);
+		
+		// helper framing/parsing
+		std::vector<std::string>	_splitCRLF(int clientFd);
+		std::string					_spaceTrim(const std::string& line) const;
+		
+		// parsing
 		struct s_Line				_parseLine(const std::string& line);
 		std::string					_handlePrefix(std::string& line);
 		std::string					_handleCommand(std::string& line);
 		std::vector<std::string>	_handleParams(std::string& line);
+		
+		// validation
 		bool						_validateLine(const s_Line& sLine) const;
+		void						_dispatchCommand(int clientFd, s_Line& line);
+		// execution
+		void						_handlePass(int clientFd, s_Line& line);
+		void						_handleNick(int clientFd, s_Line& line);
+		void						_handleUser(int clientFd, s_Line& line);
+		void						_handleJoin(int clientFd, s_Line& line);
+		void						_handlePrivmsg(int clientFd, s_Line& line);
+		void						_handlePart(int clientFd, s_Line& line);
+		void						_handleQuit(int clientFd, s_Line& line);
+
+		// print
 		void						_printClients(void) const;
-		std::string					_spaceTrim(const std::string& line) const;
 		
 	};
 #endif // !SERVER_HPP
