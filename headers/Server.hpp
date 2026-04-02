@@ -49,8 +49,12 @@ class Server {
 		void						_handleReceivedData(int client_socket);
 		std::vector<std::string>	_splitCRLF(int client_socket);
 		struct s_Line				_parseLine(const std::string& line);
+		std::string					_handlePrefix(std::string& line);
+		std::string					_handleCommand(std::string& line);
+		std::vector<std::string>	_handleParams(std::string& line);
 		bool						_validateLine(const s_Line& sLine) const;
 		void						_printClients(void) const;
 		std::string					_spaceTrim(const std::string& line) const;
+		
 	};
 #endif // !SERVER_HPP

@@ -196,6 +196,76 @@ std::string	Server::_spaceTrim(const std::string& str) const {
 	return (res);
 }
 
+std::string	Server::_handlePrefix(std::string& line) {
+	std::string prefix;
+
+	if (line[0] == ':') {
+		for (std::size_t j = 0; j < line.size(); ++j) {
+			if (line[j] == ' ' || j == (line.size() - 1)) {
+				if (line[j] != ' ') {
+					prefix = line.substr(0, j + 1);
+					line.erase(0, j + 1);
+					prefix.erase(0, 1);
+					break ;
+				}
+				prefix = line.substr(0, j);
+				while (line[j] == ' ')
+					++j;
+				line.erase(0, j);
+				prefix.erase(0, 1);
+				break ;
+			}
+		}
+	}
+	return (prefix);	
+}
+
+std::string	Server::_handleCommand(std::string& line) {
+	std::string command;
+
+	for (std::size_t j = 0; j < line.size(); ++j) { // store command
+		if (line[j] == ' ' || j == (line.size() - 1)) {
+			if (line[j] != ' ') {
+				command = line.substr(0, j + 1);
+				line.erase(0, j + 1);
+				break ;
+			}
+			command = line.substr(0, j);
+			while (line[j] == ' ')
+				++j;
+			line.erase(0, j);
+			break ;
+		}
+	}
+	return (command);	
+}
+
+std::vector<std::string>	Server::_handleParams(std::string& line) {
+	std::vector<std::string>	params;
+
+	for (std::size_t i = 0; i < line.size(); ++i) {
+		if (line[i] == ' ' || (i == line.size() - 1)) {
+			if (line[i] != ' ' && line[0] != ':') {
+				params.push_back(line.substr(0, i + 1));
+				line.erase(0, i + 1);
+				break ;
+			}
+			if (line[0] == ':') {
+				params.push_back(line.substr(1, line.size() - 1));
+				line.erase(0, i);
+				break ;
+			}
+			params.push_back(line.substr(0, i));
+			while (line[i] == ' ')
+				++i;
+			line.erase(0, i);
+			i = 0;
+		}
+	}
+	return (params);
+}
+
+
 Server::s_Line	Server::_parseLine(const std::string& line) {
 	struct s_Line				sLine;
 	if (line.empty())
@@ -203,57 +273,9 @@ Server::s_Line	Server::_parseLine(const std::string& line) {
 	std::string					lineCpy = _spaceTrim(line.substr(0));
 	
 	sLine.raw = lineCpy;
-	if (lineCpy[0] == ':') {
-		for (std::size_t j = 0; j < lineCpy.size(); ++j) {
-			if (lineCpy[j] == ' ' || j == (lineCpy.size() - 1)) {
-				if (lineCpy[j] != ' ') {
-					sLine.prefix = lineCpy.substr(0, j + 1);
-					lineCpy.erase(0, j + 1);
-					sLine.prefix.erase(0, 1);
-					break ;
-				}
-				sLine.prefix = lineCpy.substr(0, j);
-				while (lineCpy[j] == ' ')
-					++j;
-				lineCpy.erase(0, j);
-				sLine.prefix.erase(0, 1);
-				break ;
-			}
-		}
-	}
-	for (std::size_t j = 0; j < lineCpy.size(); ++j) { // store command
-		if (lineCpy[j] == ' ' || j == (lineCpy.size() - 1)) {
-			if (lineCpy[j] != ' ') {
-				sLine.command = lineCpy.substr(0, j + 1);
-				lineCpy.erase(0, j + 1);
-				break ;
-			}
-			sLine.command = lineCpy.substr(0, j);
-			while (lineCpy[j] == ' ')
-				++j;
-			lineCpy.erase(0, j);
-			break ;
-		}
-	}
-	for (std::size_t i = 0; i < lineCpy.size(); ++i) {
-		if (lineCpy[i] == ' ' || (i == lineCpy.size() - 1)) {
-			if (lineCpy[i] != ' ' && lineCpy[0] != ':') {
-				sLine.params.push_back(lineCpy.substr(0, i + 1));
-				lineCpy.erase(0, i + 1);
-				break ;
-			}
-			if (lineCpy[0] == ':') {
-				sLine.params.push_back(lineCpy.substr(1, lineCpy.size() - 1));
-				lineCpy.erase(0, i);
-				break ;
-			}
-			sLine.params.push_back(lineCpy.substr(0, i));
-			while (lineCpy[i] == ' ')
-				++i;
-			lineCpy.erase(0, i);
-			i = 0;
-		}
-	}
+	sLine.prefix = _handlePrefix(lineCpy);
+	sLine.command = _handleCommand(lineCpy);
+	sLine.params = _handleParams(lineCpy);
 	return (sLine);
 }
 
