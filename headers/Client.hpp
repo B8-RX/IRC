@@ -19,6 +19,16 @@ class Client {
 	std::string     		        bufferIn;
 	std::string     		        bufferOut;
 	
+	std::string						getNickname(void) const;
+	std::string						getUsername(void) const;
+	bool							getPassAccepted(void) const;
+	bool							getRegirstered(void) const;
+
+	std::string						setNickname(const std::string&);
+	std::string						setUsername(const std::string&);
+	bool							setPassAccepted(bool state);
+	bool							setRegirstered(bool state);
+
 private:
 	std::string             		_nickname;
 	bool							_hasNick;

@@ -105,8 +105,8 @@ void	Server::_handleReceivedData(int clientFd) {
 	memset(buffer, 0, sizeof(buffer));
 	readBytes = recv(clientFd, buffer, sizeof(buffer), MSG_DONTWAIT);
 	if (readBytes == 0) {
-		//INFO end of line reached or client disconnected. cleanup...
-		//TODO cleanup: remove the client from the channels where he is a member
+		//?INFO: end of line reached or client disconnected. cleanup...
+		//TODO: cleanup: remove the client from the channels where he is a member
 		std::cout << "cleanup client [" << clientFd << "]\n";
 		close(_clientList[clientFd].fd);
 		_clientList.erase(clientFd);
@@ -120,7 +120,7 @@ void	Server::_handleReceivedData(int clientFd) {
 	}
 	else if (readBytes == -1) {
 		if (errno == EAGAIN || errno == EWOULDBLOCK) {
-		// DATA NOT READY AND OPTION O_NONBLOCK IS ENABLED ON THE SOCKET (silently ignored)
+		//?INFO: DATA IS NOT READY AND OPTION O_NONBLOCK IS ENABLED ON THE SOCKET (silently ignored)
 			return ;
 		}
 		else
@@ -207,15 +207,17 @@ Server::s_Line	Server::_parseLine(const std::string& line) {
 		for (std::size_t j = 0; j < lineCpy.size(); ++j) {
 			if (lineCpy[j] == ' ' || j == (lineCpy.size() - 1)) {
 				if (lineCpy[j] != ' ') {
-					sLine.prefix = lineCpy.substr(1, j);
-					return (sLine);
+					sLine.prefix = lineCpy.substr(0, j + 1);
+					lineCpy.erase(0, j + 1);
+					sLine.prefix.erase(0, 1);
+					break ;
 				}
 				sLine.prefix = lineCpy.substr(0, j);
 				while (lineCpy[j] == ' ')
 					++j;
 				lineCpy.erase(0, j);
 				sLine.prefix.erase(0, 1);
-				break;
+				break ;
 			}
 		}
 	}
@@ -223,24 +225,27 @@ Server::s_Line	Server::_parseLine(const std::string& line) {
 		if (lineCpy[j] == ' ' || j == (lineCpy.size() - 1)) {
 			if (lineCpy[j] != ' ') {
 				sLine.command = lineCpy.substr(0, j + 1);
-				return (sLine);
+				lineCpy.erase(0, j + 1);
+				break ;
 			}
 			sLine.command = lineCpy.substr(0, j);
 			while (lineCpy[j] == ' ')
 				++j;
 			lineCpy.erase(0, j);
-			break;
+			break ;
 		}
 	}
 	for (std::size_t i = 0; i < lineCpy.size(); ++i) {
 		if (lineCpy[i] == ' ' || (i == lineCpy.size() - 1)) {
 			if (lineCpy[i] != ' ' && lineCpy[0] != ':') {
 				sLine.params.push_back(lineCpy.substr(0, i + 1));
-				return (sLine);
+				lineCpy.erase(0, i + 1);
+				break ;
 			}
 			if (lineCpy[0] == ':') {
 				sLine.params.push_back(lineCpy.substr(1, lineCpy.size() - 1));
-				return (sLine);
+				lineCpy.erase(0, i);
+				break ;
 			}
 			sLine.params.push_back(lineCpy.substr(0, i));
 			while (lineCpy[i] == ' ')
