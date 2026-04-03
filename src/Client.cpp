@@ -2,7 +2,7 @@
 #include <iostream>
 #include <string>
 
-Client::Client(void) : _hasNick(false), _hasUser(false), _passAccepted(false), _registered(false) {}
+Client::Client(void) : hasNick(false), hasUser(false), _passAccepted(false), _registered(false) {}
 Client::~Client(void) {}
 
 std::string Client::getNickname(void) const {
@@ -23,13 +23,13 @@ bool    Client::getRegirstered(void) const {
 
 std::string Client::setNickname(const std::string& nick) {
     _nickname = nick;
-    _hasNick = true;
+    hasNick = true;
     return (_nickname);
 }
 
 std::string Client::setUsername(const std::string& user) {
     _username = user;
-    _hasUser = true;
+    hasUser = true;
     return (_username);
 }
 

@@ -31,17 +31,17 @@ class Server {
 					return (_message.c_str());
 				}
 		};
-	private:
-		static bool					_signalReceived;
-		std::string					_password;
-		bool						_passwordEnabled;
-		// structures metier
 		struct s_Line {
 			std::string					raw;
 			std::string					prefix;
 			std::string					command;
 			std::vector<std::string>	params;
 		};
+	private:
+		static bool					_signalReceived;
+		std::string					_password;
+		bool						_passwordEnabled;
+		// structures metier
 		std::map<int, Client>		_clientList; 
 		std::map<int, Channel>		_channelList;
 
@@ -65,16 +65,17 @@ class Server {
 		std::vector<std::string>	_handleParams(std::string& line);
 		
 		// validation
-		bool						_validateLine(const s_Line& sLine) const;
+		bool						_validateLine(int clientFd, const s_Line& sLine);
 		void						_dispatchCommand(int clientFd, s_Line& line);
+		bool						_updateRegisteredState(int clientFd);
 		// execution
-		void						_handlePass(int clientFd, s_Line& line);
-		void						_handleNick(int clientFd, s_Line& line);
-		void						_handleUser(int clientFd, s_Line& line);
-		void						_handleJoin(int clientFd, s_Line& line);
-		void						_handlePrivmsg(int clientFd, s_Line& line);
-		void						_handlePart(int clientFd, s_Line& line);
-		void						_handleQuit(int clientFd, s_Line& line);
+		bool						_handlePass(int clientFd, const s_Line& line);
+		bool						_handleNick(int clientFd, const s_Line& line);
+		bool						_handleUser(int clientFd, const s_Line& line);
+		void						_handleJoin(int clientFd, const s_Line& line) const;
+		void						_handlePrivmsg(int clientFd, const s_Line& line) const;
+		void						_handlePart(int clientFd, const s_Line& line) const;
+		void						_handleQuit(int clientFd, const s_Line& line) const;
 
 		// print
 		void						_printClients(void) const;

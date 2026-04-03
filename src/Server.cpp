@@ -1,6 +1,7 @@
 #include "Server.hpp"
 #include "Client.hpp"
 #include "Channel.hpp"
+#include "utils.hpp"
 #include <string>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -142,30 +143,37 @@ void	Server::_handleReceivedData(int clientFd) {
 	
 	for (std::size_t i = 0; i < vLines.size(); ++i) {
 		sLine = _parseLine(vLines[i]);
-		_validateLine(sLine);
+		_validateLine(clientFd, sLine);
+		printLine(sLine);
 	}
+	printClient(_clientList[clientFd]);
+}
 
-	std::cout << "buffer_in: [" << _clientList[clientFd].bufferIn << "]\n";
+bool	Server::_validateLine(int clientFd, const s_Line& sLine) { // change name to checkAndExecuteLine
+	
+	// TODO check if command is known
+	// TODO check if params are good
+	// TODO update registration
+	
+	bool	isValid = false;	
+	
+	if (sLine.command == "PASS")		
+		isValid = _handlePass(clientFd, sLine);
+	else if (sLine.command == "NICK")
+		isValid = _handleNick(clientFd, sLine);
+	else {
+		std::cout << "send error: ERR_UNKNOWNCOMMAND (421)\n";
+	}	
+	if (isValid)
+		_updateRegisteredState(clientFd);
+	return (isValid);
+}
 
 	/* TODO: FRAMING */ //!done 
 	/* TODO: PARSING */ //!done
 	/* TODO: VALIDATE COMBINAISON */ //? in progress
 	// TODO: EXECUTE 
 	// TODO: REPEAT 
-}
-
-bool	Server::_validateLine(const s_Line& sLine) const {
-	std::cout << "raw line: [" << sLine.raw << "]\n";
-	std::cout << "prefix: [" << (sLine.prefix.empty() ? "" : sLine.prefix) << "]\n";
-	std::cout << "command: [" << (sLine.command.empty() ? "" : sLine.command) << "]\n";		
-	for (std::size_t i = 0; i < sLine.params.size(); ++i) {
-		std::cout << "param:[" << sLine.params[i] << "]\n";
-	}		
-	std::cout << "\n";
-
-	// TODO check if command is supported
-	// TODO check if params are good
-	// TODO check if registered is needed
 
 	/*
 		COMMANDS ARRAY
@@ -183,7 +191,7 @@ bool	Server::_validateLine(const s_Line& sLine) const {
 	- pre-register allowed = yes
 
 				QUIT
-	- nb params = *
+	- nb params = 0
 	- pre-register allowed = yes
 
 	/////////////////////////////////////////////////////////
@@ -193,11 +201,15 @@ bool	Server::_validateLine(const s_Line& sLine) const {
 	- pre-register allowed = no
 
 
+			 PRIVMSG
+	- nb params = 2
+	- pre-register allowed = no
 
+			 PART
+	- nb params = 1
+	- pre-register allowed = no
 
 	*/
-	return (true);
-}
 
 std::vector<std::string>	Server::_splitCRLF(int clientFd) {
 
@@ -369,34 +381,95 @@ void	Server::_dispatchCommand(int clientFd, s_Line& line) {
 	(void)clientFd;
 	(void)line;
 }
-void	Server::_handlePass(int clientFd, s_Line& line) {
+
+bool	Server::_updateRegisteredState(int clientFd) {
+	Client*	cli = &_clientList[clientFd];
+	cli->setRegirstered((cli->getPassAccepted() || !_passwordEnabled) && cli->hasNick && cli->hasUser);
+	return (cli->getRegirstered());
+}
+
+bool	Server::_handlePass(int clientFd, const s_Line& line) {
+	Client*	cli = &_clientList[clientFd];
+	
+	if (line.params.empty()) {
+		std::cout << "send an error:  ERR_NEEDMOREPARAMS (461) \n";
+		return (false); // IGNORE OR CLOSE ?
+	}
+
+	if (cli->getRegirstered()) {
+		std::cout << "send an error: ERR_ALREADYREGISTERED (462)\n";
+		return (false);
+	}
+	if (line.params[0] == _password || !_passwordEnabled) {
+		std::cout << "password accepted\n";
+		cli->setPassAccepted(true);
+	}
+	else {
+		std::cout << "send an error: ERR_PASSWDMISMATCH (464)\n"; // CLOSE THE CONNECTION WITH ERROR
+		cli->setPassAccepted(false);
+		return (false);
+	}
+	return (true);
+}
+
+
+bool	Server::_handleNick(int clientFd, const s_Line& line) {
+	std::cout << "handle nick command\n";
+	bool	isValid = false;
+
+	// TODO: IF NO PARAMETERS 
+		//! if error =>  ERR_NONICKNAMEGIVEN (431) 
+	if (line.params.empty()) {
+		std::cout << "send error:   ERR_NONICKNAMEGIVEN (431)  \n"; // AND IGNORE COMMAND
+		return (false);
+	}
+
+	// TODO: CHECK IF NICKNAME FOLLOW RULES (NOT START WITH: NUMERIC/CHANTYPES/':'/NO_ASCII_SPACES/)  
+		//! if error =>  ERR_ERRONEUSNICKNAME (432) 
+	if ((isValid = isValidNick(line.params[0])) == false)
+		return (std::cout << "send error: ERR_ERRONEUSNICKNAME (432)\n", false);
+		
+		
+	// TODO: CHECK IF NICKNAME ALREADY USED IN THE SERVER
+		//! if error => ERR_NICKNAMEINUSE (433)
+	if ((isValid = isUsedNick(_clientList , line.params[0])) == true)
+		return (std::cout << "send error: ERR_NICKNAMEINUSE (433)\n", false);
+		
+	
+	// TODO: GIVE CLIENT NICKNAME OR CHANGE PREVIOUS ONE
+	_clientList[clientFd].setNickname(line.params[0]);
+	_clientList[clientFd].hasNick = true;
+
+	// TODO: SERVER MUST  SEND TO CLIENTS ACKNOLEDGMENT TO SAY THEIR NICK COMMAND WAS SUCCESSFUL, AND TELL OTHER CLIENTS ABOUT THE CHANGE OF NICKNAME. <source> of the message will be the old nickname 
+	return (isValid);
+}
+bool	Server::_handleUser(int clientFd, const s_Line& line) {
+	std::cout << "handle user command\n";
+	bool	isValid = false;
+	(void)clientFd;
+	(void)line;
+	return (isValid);
+}
+void	Server::_handleJoin(int clientFd, const s_Line& line) const {
+	std::cout << "handle join command\n";
 	(void)clientFd;
 	(void)line;
 }
-void	Server::_handleNick(int clientFd, s_Line& line) {
+void	Server::_handlePrivmsg(int clientFd, const s_Line& line) const {
+	std::cout << "handle privmsg command\n";
 	(void)clientFd;
 	(void)line;
 }
-void	Server::_handleUser(int clientFd, s_Line& line) {
+void	Server::_handlePart(int clientFd, const s_Line& line) const {
+	std::cout << "handle part command\n";
 	(void)clientFd;
 	(void)line;
 }
-void	Server::_handleJoin(int clientFd, s_Line& line) {
-	(void)clientFd;
-	(void)line;
-}
-void	Server::_handlePrivmsg(int clientFd, s_Line& line) {
-	(void)clientFd;
-	(void)line;
-}
-void	Server::_handlePart(int clientFd, s_Line& line) {
-	(void)clientFd;
-	(void)line;
-}
-void	Server::_handleQuit(int clientFd, s_Line& line) {
+void	Server::_handleQuit(int clientFd, const s_Line& line) const {
+	std::cout << "handle quit command\n";
 	(void)clientFd;
 	(void)line;
 }
 void	Server::_cleanupClient(int clientFd) {
-	(void)clientFd;
+	std::cout << "cleanup client [" << clientFd << "]\n";
 }

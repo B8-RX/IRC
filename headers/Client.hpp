@@ -23,6 +23,8 @@ class Client {
 	std::string						getUsername(void) const;
 	bool							getPassAccepted(void) const;
 	bool							getRegirstered(void) const;
+	bool							hasNick;
+	bool							hasUser;
 
 	std::string						setNickname(const std::string&);
 	std::string						setUsername(const std::string&);
@@ -31,10 +33,8 @@ class Client {
 
 private:
 	std::string             		_nickname;
-	bool							_hasNick;
 	std::string             		_username;
 	std::string						_realName;
-	bool							_hasUser;
 	bool							_passAccepted;
 	bool                    		_registered;
 	std::map<int, Channel>  		_channels;
