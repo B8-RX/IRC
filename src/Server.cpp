@@ -143,13 +143,13 @@ void	Server::_handleReceivedData(int clientFd) {
 	
 	for (std::size_t i = 0; i < vLines.size(); ++i) {
 		sLine = _parseLine(vLines[i]);
-		_validateLine(clientFd, sLine);
+		_checkAndExecuteLine(clientFd, sLine);
 		printLine(sLine);
 	}
 	printClient(_clientList[clientFd]);
 }
 
-bool	Server::_validateLine(int clientFd, const s_Line& sLine) { // change name to checkAndExecuteLine
+bool	Server::_checkAndExecuteLine(int clientFd, const s_Line& sLine) { // change name to checkAndExecuteLine
 	
 	// TODO check if command is known
 	// TODO check if params are good
@@ -161,11 +161,12 @@ bool	Server::_validateLine(int clientFd, const s_Line& sLine) { // change name t
 		isValid = _handlePass(clientFd, sLine);
 	else if (sLine.command == "NICK")
 		isValid = _handleNick(clientFd, sLine);
+	else if (sLine.command == "USER")
+		isValid = _handleUser(clientFd, sLine);
 	else {
 		std::cout << "send error: ERR_UNKNOWNCOMMAND (421)\n";
+		isValid = false;
 	}	
-	if (isValid)
-		_updateRegisteredState(clientFd);
 	return (isValid);
 }
 
@@ -377,10 +378,6 @@ void Server::sighandler(int signum) {
 	std::cout << "Unknown signal: " << signum << "\n";
 	_signalReceived = true;
 }
-void	Server::_dispatchCommand(int clientFd, s_Line& line) {
-	(void)clientFd;
-	(void)line;
-}
 
 bool	Server::_updateRegisteredState(int clientFd) {
 	Client*	cli = &_clientList[clientFd];
@@ -393,9 +390,8 @@ bool	Server::_handlePass(int clientFd, const s_Line& line) {
 	
 	if (line.params.empty()) {
 		std::cout << "send an error:  ERR_NEEDMOREPARAMS (461) \n";
-		return (false); // IGNORE OR CLOSE ?
+		return (false); // IGNORE AND CONTINUE
 	}
-
 	if (cli->getRegirstered()) {
 		std::cout << "send an error: ERR_ALREADYREGISTERED (462)\n";
 		return (false);
@@ -405,17 +401,17 @@ bool	Server::_handlePass(int clientFd, const s_Line& line) {
 		cli->setPassAccepted(true);
 	}
 	else {
-		std::cout << "send an error: ERR_PASSWDMISMATCH (464)\n"; // CLOSE THE CONNECTION WITH ERROR
+		std::cout << "send an error: ERR_PASSWDMISMATCH (464)\n"; 
 		cli->setPassAccepted(false);
 		return (false);
 	}
+	_updateRegisteredState(clientFd);
 	return (true);
 }
 
 
 bool	Server::_handleNick(int clientFd, const s_Line& line) {
 	std::cout << "handle nick command\n";
-	bool	isValid = false;
 
 	// TODO: IF NO PARAMETERS 
 		//! if error =>  ERR_NONICKNAMEGIVEN (431) 
@@ -426,13 +422,13 @@ bool	Server::_handleNick(int clientFd, const s_Line& line) {
 
 	// TODO: CHECK IF NICKNAME FOLLOW RULES (NOT START WITH: NUMERIC/CHANTYPES/':'/NO_ASCII_SPACES/)  
 		//! if error =>  ERR_ERRONEUSNICKNAME (432) 
-	if ((isValid = isValidNick(line.params[0])) == false)
+	if (isValidNick(line.params[0]) == false)
 		return (std::cout << "send error: ERR_ERRONEUSNICKNAME (432)\n", false);
 		
 		
 	// TODO: CHECK IF NICKNAME ALREADY USED IN THE SERVER
 		//! if error => ERR_NICKNAMEINUSE (433)
-	if ((isValid = isUsedNick(_clientList , line.params[0])) == true)
+	if (isUsedNick(_clientList , line.params[0], clientFd) == true)
 		return (std::cout << "send error: ERR_NICKNAMEINUSE (433)\n", false);
 		
 	
@@ -441,15 +437,27 @@ bool	Server::_handleNick(int clientFd, const s_Line& line) {
 	_clientList[clientFd].hasNick = true;
 
 	// TODO: SERVER MUST  SEND TO CLIENTS ACKNOLEDGMENT TO SAY THEIR NICK COMMAND WAS SUCCESSFUL, AND TELL OTHER CLIENTS ABOUT THE CHANGE OF NICKNAME. <source> of the message will be the old nickname 
-	return (isValid);
+	_updateRegisteredState(clientFd);
+	return (true);
 }
+
 bool	Server::_handleUser(int clientFd, const s_Line& line) {
 	std::cout << "handle user command\n";
-	bool	isValid = false;
-	(void)clientFd;
-	(void)line;
-	return (isValid);
+	Client* cli = &_clientList[clientFd];
+
+	if (cli->getRegirstered()) {
+		std::cout << "send an error: ERR_ALREADYREGISTERED (462)\n";
+		return (false);
+	}
+	if (line.params.size() < 4)
+		return (std::cout << "send an error:  ERR_NEEDMOREPARAMS (461) \n", false);
+	cli->setUsername(line.params[0]);
+	cli->setRealname(line.params[3]);
+	cli->hasUser = true;
+	_updateRegisteredState(clientFd);
+	return (true);
 }
+
 void	Server::_handleJoin(int clientFd, const s_Line& line) const {
 	std::cout << "handle join command\n";
 	(void)clientFd;

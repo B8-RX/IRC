@@ -21,6 +21,7 @@ void printClient(const Client& client) {
 	std::cout << "client fd: [" << client.fd << "]\n";
 	std::cout << "client nickname: [" << (client.getNickname().empty() ? "" : client.getNickname()) << "]\n";
 	std::cout << "client username: [" << (client.getUsername().empty() ? "" : client.getUsername()) << "]\n";
+	std::cout << "client realname: [" << (client.getRealname().empty() ? "" : client.getRealname()) << "]\n";
 	std::cout << "client pass accepted: [" << (client.getPassAccepted() ? "true" : "false") << "]\n";
 	std::cout << "client registered: [" << (client.getRegirstered() ? "true" : "false") << "]\n";
 	std::cout << "buffer in: [" << client.bufferIn << "]\n";
@@ -32,7 +33,7 @@ bool	isValidNick(const std::string& nick) {
 	if (nick.empty())
 		return (false);
 	std::string	disallowedFirstChar = "0123456789:#"; 
-	std::string allowedChar = "0123456789abcdefghijklmnopqrstuvwxyz[]{}|\\ ";
+	std::string allowedChar = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ[]{}|\\-_";
 	if (disallowedFirstChar.find(nick[0]) != std::string::npos)
 		return (false);
 	for (std::size_t i = 1; i < nick.size(); ++i) {
@@ -42,12 +43,12 @@ bool	isValidNick(const std::string& nick) {
 	return (true);
 }
 
-bool	isUsedNick(std::map<int, Client>& ClientsList, const std::string& nick) {
+bool	isUsedNick(std::map<int, Client>& ClientsList, const std::string& nick, int clientFd) {
 	std::map<int, Client>::iterator it = ClientsList.begin();
 	std::map<int, Client>::iterator itEnd = ClientsList.end();
 
 	for (; it != itEnd; ++it) {
-		if (it->second.hasNick && it->second.getNickname() == nick)
+		if (clientFd != it->first && it->second.hasNick && it->second.getNickname() == nick)
 			return (true);
 	}
 	return (false);

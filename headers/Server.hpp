@@ -65,7 +65,7 @@ class Server {
 		std::vector<std::string>	_handleParams(std::string& line);
 		
 		// validation
-		bool						_validateLine(int clientFd, const s_Line& sLine);
+		bool						_checkAndExecuteLine(int clientFd, const s_Line& sLine);
 		void						_dispatchCommand(int clientFd, s_Line& line);
 		bool						_updateRegisteredState(int clientFd);
 		// execution

@@ -13,6 +13,10 @@ std::string Client::getUsername(void) const {
     return (_username);
 }
 
+std::string Client::getRealname(void) const {
+    return (_realname);
+}
+
 bool    Client::getPassAccepted(void) const {
     return (_passAccepted);
 }
@@ -31,6 +35,11 @@ std::string Client::setUsername(const std::string& user) {
     _username = user;
     hasUser = true;
     return (_username);
+}
+
+std::string Client::setRealname(const std::string& name) {
+    _realname = name;
+    return (_realname);
 }
 
 bool    Client::setPassAccepted(bool state) {
