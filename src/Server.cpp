@@ -449,7 +449,7 @@ bool	Server::_handleUser(int clientFd, const s_Line& line) {
 		std::cout << "send an error: ERR_ALREADYREGISTERED (462)\n";
 		return (false);
 	}
-	if (line.params.size() < 4)
+	if (line.params.size() < 4 || line.params[0].empty())
 		return (std::cout << "send an error:  ERR_NEEDMOREPARAMS (461) \n", false);
 	cli->setUsername(line.params[0]);
 	cli->setRealname(line.params[3]);
