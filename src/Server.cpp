@@ -250,22 +250,16 @@ std::string	Server::_spaceTrim(const std::string& str) const {
 std::string	Server::_handlePrefix(std::string& line) {
 	std::string prefix;
 
-	if (line[0] == ':') {
-		for (std::size_t j = 0; j < line.size(); ++j) {
-			if (line[j] == ' ' || j == (line.size() - 1)) {
-				if (line[j] != ' ') {
-					prefix = line.substr(0, j + 1);
-					line.erase(0, j + 1);
-					prefix.erase(0, 1);
-					break ;
-				}
-				prefix = line.substr(0, j);
-				while (line[j] == ' ')
-					++j;
-				line.erase(0, j);
-				prefix.erase(0, 1);
-				break ;
-			}
+	if (!line.empty() && line[0] == ':') {
+		std::size_t	pos = line.find(' ');
+		if (pos == std::string::npos) {
+			prefix = line.substr(1);
+			line.erase(0, line.size());
+		}
+		else {
+			prefix = line.substr(0, pos);
+			prefix.erase(0, 1);
+			line.erase(0, pos);
 		}
 	}
 	return (prefix);	
@@ -274,71 +268,54 @@ std::string	Server::_handlePrefix(std::string& line) {
 std::string	Server::_handleCommand(std::string& line) {
 	std::string command;
 
-	while (!line.empty()) {
-		int start = 0;
-
-		while (line[start] == ' ')
-			start++;
-		if (start > 0) {
-			line.erase(0, start);
-			break;
-		}
-		if (line.empty())
-			break;
-		
+	int start = 0;
+	
+	while (line[start] == ' ')
+		++start;
+	if (start > 0)
+		line.erase(0, start);
+	if (!line.empty()) {
 		std::size_t	pos = line.find(' ');
 		if (pos == std::string::npos) {
 			command = line.substr();
 			line.erase(0, command.size());
-			break;
+			std::cout << "1 command = [" << command << "]\n";
 		}
-		command = line.substr(0, pos);
-		line.erase(0, command.size());
+		else {
+			std::cout << "2 command = [" << command << "]\n";
+			command = line.substr(0, pos);
+			line.erase(0, pos);
+		}
 	}
-
-	// for (std::size_t j = 0; j < line.size(); ++j) { // store command
-	// 	if (line[j] == ' ' || j == (line.size() - 1)) {
-	// 		if (line[j] != ' ') {
-	// 			command = line.substr(0, j + 1);
-	// 			line.erase(0, j + 1);
-	// 			break ;
-	// 		}
-	// 		command = line.substr(0, j);
-	// 		while (line[j] == ' ')
-	// 			++j;
-	// 		line.erase(0, j);
-	// 		break ;
-	// 	}
-	// }
 	return (command);	
 }
 
 std::vector<std::string>	Server::_handleParams(std::string& line) {
 	std::vector<std::string>	params;
-
+	
 	while (!line.empty()) {
 		int start = 0;
-
+		
 		while (line[start] == ' ')
-			start++;
+			++start;
 		
 		if (start > 0)
 			line.erase(0, start);
 		
 		if (line.empty())
 			break ;
-
+		
 		if (line[0] == ':') {
 			params.push_back(line.substr(1));
 			break ;
 		}
-
+		
 		std::size_t pos = line.find(' ');
 		if (pos == std::string::npos) {
 			params.push_back(line.substr(0, line.size()));
 			break ;
 		}
-
+		
 		params.push_back(line.substr(0, pos));
 		line.erase(0, pos);
 	}
