@@ -274,20 +274,42 @@ std::string	Server::_handlePrefix(std::string& line) {
 std::string	Server::_handleCommand(std::string& line) {
 	std::string command;
 
-	for (std::size_t j = 0; j < line.size(); ++j) { // store command
-		if (line[j] == ' ' || j == (line.size() - 1)) {
-			if (line[j] != ' ') {
-				command = line.substr(0, j + 1);
-				line.erase(0, j + 1);
-				break ;
-			}
-			command = line.substr(0, j);
-			while (line[j] == ' ')
-				++j;
-			line.erase(0, j);
-			break ;
+	while (!line.empty()) {
+		int start = 0;
+
+		while (line[start] == ' ')
+			start++;
+		if (start > 0) {
+			line.erase(0, start);
+			break;
 		}
+		if (line.empty())
+			break;
+		
+		std::size_t	pos = line.find(' ');
+		if (pos == std::string::npos) {
+			command = line.substr();
+			line.erase(0, command.size());
+			break;
+		}
+		command = line.substr(0, pos);
+		line.erase(0, command.size());
 	}
+
+	// for (std::size_t j = 0; j < line.size(); ++j) { // store command
+	// 	if (line[j] == ' ' || j == (line.size() - 1)) {
+	// 		if (line[j] != ' ') {
+	// 			command = line.substr(0, j + 1);
+	// 			line.erase(0, j + 1);
+	// 			break ;
+	// 		}
+	// 		command = line.substr(0, j);
+	// 		while (line[j] == ' ')
+	// 			++j;
+	// 		line.erase(0, j);
+	// 		break ;
+	// 	}
+	// }
 	return (command);	
 }
 
@@ -447,7 +469,7 @@ bool	Server::_handleUser(int clientFd, const s_Line& line) {
 		std::cout << "send an error: ERR_ALREADYREGISTERED (462)\n";
 		return (false);
 	}
-	if (line.params.size() != 4 || line.params[0].empty())
+	if (line.params.size() < 4 || line.params[0].empty())
 		return (std::cout << "send an error:  ERR_NEEDMOREPARAMS (461) \n", false);
 	cli->setUsername(line.params[0]);
 	cli->setRealname(line.params[3]);
