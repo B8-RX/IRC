@@ -72,7 +72,7 @@ class Server {
 		bool						_handlePass(int clientFd, const s_Line& line);
 		bool						_handleNick(int clientFd, const s_Line& line);
 		bool						_handleUser(int clientFd, const s_Line& line);
-		void						_handleJoin(int clientFd, const s_Line& line) const;
+		bool						_handleJoin(int clientFd, const s_Line& line);
 		void						_handlePrivmsg(int clientFd, const s_Line& line) const;
 		void						_handlePart(int clientFd, const s_Line& line) const;
 		void						_handleQuit(int clientFd, const s_Line& line) const;

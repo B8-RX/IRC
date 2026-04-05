@@ -163,6 +163,8 @@ bool	Server::_checkAndExecuteLine(int clientFd, const s_Line& sLine) { // change
 		isValid = _handleNick(clientFd, sLine);
 	else if (sLine.command == "USER")
 		isValid = _handleUser(clientFd, sLine);
+	else if (sLine.command == "JOIN")
+		isValid = _handleJoin(clientFd, sLine);
 	else {
 		std::cout << "send error: ERR_UNKNOWNCOMMAND (421)\n";
 		isValid = false;
@@ -362,8 +364,7 @@ void	Server::closeSockets(void) {
 		close(it->second.fd);
 	}
 	for (size_t i  = 0; i < _channelList.size(); ++i) {
-		std::cout << "cleanup channel [" << _channelList[i].fd << "]\n";
-		close(_channelList[i].fd);
+		std::cout << "cleanup channel [" << _channelList[i].getName() << "]\n";
 		_channelList.erase(i);
 	}
 	if (_serverSocket != -1) {
@@ -454,12 +455,18 @@ bool	Server::_handleUser(int clientFd, const s_Line& line) {
 	_updateRegisteredState(clientFd);
 	return (true);
 }
-
-void	Server::_handleJoin(int clientFd, const s_Line& line) const {
+	
+bool	Server::_handleJoin(int clientFd, const s_Line& line) {
 	std::cout << "handle join command\n";
 	(void)clientFd;
-	(void)line;
+	if (line.params.empty())
+		return (std::cout << "send an error:  ERR_NEEDMOREPARAMS (461) \n", false);
+	// check if valid prefix Chantype (default= '#')	
+	if (line.params[0][0] != '#')
+		return (std::cout << "send error: ERR_NOSUCHCHANNEL (403)\n", false); // in rpl_info tells channel start with '#' ??
+	return (true);
 }
+
 void	Server::_handlePrivmsg(int clientFd, const s_Line& line) const {
 	std::cout << "handle privmsg command\n";
 	(void)clientFd;
