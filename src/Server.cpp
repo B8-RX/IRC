@@ -279,10 +279,8 @@ std::string	Server::_handleCommand(std::string& line) {
 		if (pos == std::string::npos) {
 			command = line.substr();
 			line.erase(0, command.size());
-			std::cout << "1 command = [" << command << "]\n";
 		}
 		else {
-			std::cout << "2 command = [" << command << "]\n";
 			command = line.substr(0, pos);
 			line.erase(0, pos);
 		}
@@ -402,7 +400,9 @@ bool	Server::_handlePass(int clientFd, const s_Line& line) {
 		std::cout << "send an error: ERR_ALREADYREGISTERED (462)\n";
 		return (false);
 	}
-	if (line.params[0] == _password || !_passwordEnabled) {
+	if (!_passwordEnabled)
+		return (true);
+	if (line.params[0] == _password) {
 		std::cout << "password accepted\n";
 		cli->setPassAccepted(true);
 	}
