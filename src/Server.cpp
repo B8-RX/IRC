@@ -294,24 +294,31 @@ std::string	Server::_handleCommand(std::string& line) {
 std::vector<std::string>	Server::_handleParams(std::string& line) {
 	std::vector<std::string>	params;
 
-	for (std::size_t i = 0; i < line.size(); ++i) {
-		if (line[i] == ' ' || (i == line.size() - 1)) {
-			if (line[i] != ' ' && line[0] != ':') {
-				params.push_back(line.substr(0, i + 1));
-				line.erase(0, i + 1);
-				break ;
-			}
-			if (line[0] == ':') {
-				params.push_back(line.substr(1, line.size() - 1));
-				line.erase(0, i);
-				break ;
-			}
-			params.push_back(line.substr(0, i));
-			while (line[i] == ' ')
-				++i;
-			line.erase(0, i);
-			i = 0;
+	while (!line.empty()) {
+		int start = 0;
+
+		while (line[start] == ' ')
+			start++;
+		
+		if (start > 0)
+			line.erase(0, start);
+		
+		if (line.empty())
+			break ;
+
+		if (line[0] == ':') {
+			params.push_back(line.substr(1));
+			break ;
 		}
+
+		std::size_t pos = line.find(' ');
+		if (pos == std::string::npos) {
+			params.push_back(line.substr(0, line.size()));
+			break ;
+		}
+
+		params.push_back(line.substr(0, pos));
+		line.erase(0, pos);
 	}
 	return (params);
 }
@@ -413,26 +420,17 @@ bool	Server::_handlePass(int clientFd, const s_Line& line) {
 bool	Server::_handleNick(int clientFd, const s_Line& line) {
 	std::cout << "handle nick command\n";
 
-	// TODO: IF NO PARAMETERS 
-		//! if error =>  ERR_NONICKNAMEGIVEN (431) 
 	if (line.params.empty()) {
-		std::cout << "send error:   ERR_NONICKNAMEGIVEN (431)  \n"; // AND IGNORE COMMAND
+		std::cout << "send error:   ERR_NONICKNAMEGIVEN (431)  \n";
 		return (false);
 	}
 
-	// TODO: CHECK IF NICKNAME FOLLOW RULES (NOT START WITH: NUMERIC/CHANTYPES/':'/NO_ASCII_SPACES/)  
-		//! if error =>  ERR_ERRONEUSNICKNAME (432) 
 	if (isValidNick(line.params[0]) == false)
 		return (std::cout << "send error: ERR_ERRONEUSNICKNAME (432)\n", false);
 		
-		
-	// TODO: CHECK IF NICKNAME ALREADY USED IN THE SERVER
-		//! if error => ERR_NICKNAMEINUSE (433)
 	if (isUsedNick(_clientList , line.params[0], clientFd) == true)
 		return (std::cout << "send error: ERR_NICKNAMEINUSE (433)\n", false);
 		
-	
-	// TODO: GIVE CLIENT NICKNAME OR CHANGE PREVIOUS ONE
 	_clientList[clientFd].setNickname(line.params[0]);
 	_clientList[clientFd].hasNick = true;
 
@@ -449,7 +447,7 @@ bool	Server::_handleUser(int clientFd, const s_Line& line) {
 		std::cout << "send an error: ERR_ALREADYREGISTERED (462)\n";
 		return (false);
 	}
-	if (line.params.size() < 4 || line.params[0].empty())
+	if (line.params.size() != 4 || line.params[0].empty())
 		return (std::cout << "send an error:  ERR_NEEDMOREPARAMS (461) \n", false);
 	cli->setUsername(line.params[0]);
 	cli->setRealname(line.params[3]);

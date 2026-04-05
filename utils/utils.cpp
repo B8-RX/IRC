@@ -33,7 +33,7 @@ bool	isValidNick(const std::string& nick) {
 	if (nick.empty())
 		return (false);
 	std::string	disallowedFirstChar = "0123456789:#"; 
-	std::string allowedChar = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ[]{}|\\-_";
+	std::string allowedChar = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ[]{}|\\-_.";
 	if (disallowedFirstChar.find(nick[0]) != std::string::npos)
 		return (false);
 	for (std::size_t i = 1; i < nick.size(); ++i) {
