@@ -1,11 +1,8 @@
-
 #include "Server.hpp"
 #include "Client.hpp"
-#include "utils.hpp"
-#include <string>
 #include <iostream>
 
-void printLine(const Server::s_Line& sLine) {
+void    Server::_printLine(const Server::s_Line& sLine) {
 	std::cout << "raw line: [" << sLine.raw << "]\n";
 	std::cout << "prefix: [" << (sLine.prefix.empty() ? "" : sLine.prefix) << "]\n";
 	std::cout << "command: [" << (sLine.command.empty() ? "" : sLine.command) << "]\n";		
@@ -16,7 +13,7 @@ void printLine(const Server::s_Line& sLine) {
 
 }
 
-void printClient(const Client& client) {
+void    Server::_printClient(const Client& client) {
 	std::cout << "|| Client Info ||\n";
 	std::cout << "client fd: [" << client.fd << "]\n";
 	std::cout << "client nickname: [" << (client.getNickname().empty() ? "" : client.getNickname()) << "]\n";
@@ -29,7 +26,7 @@ void printClient(const Client& client) {
 }
 
 
-bool	isValidNick(const std::string& nick) {
+bool    Server::_isValidNick(const std::string& nick) {
 	if (nick.empty())
 		return (false);
 	std::string	disallowedFirstChar = "0123456789:#"; 
@@ -43,7 +40,7 @@ bool	isValidNick(const std::string& nick) {
 	return (true);
 }
 
-bool	isUsedNick(std::map<int, Client>& ClientsList, const std::string& nick, int clientFd) {
+bool    Server::_isUsedNick(std::map<int, Client>& ClientsList, const std::string& nick, int clientFd) {
 	std::map<int, Client>::iterator it = ClientsList.begin();
 	std::map<int, Client>::iterator itEnd = ClientsList.end();
 

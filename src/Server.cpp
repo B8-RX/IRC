@@ -1,7 +1,9 @@
 #include "Server.hpp"
 #include "Client.hpp"
 #include "Channel.hpp"
-#include "utils.hpp"
+#include "Server_parsing.cpp"
+#include "Server_command.cpp"
+#include "Server_utils.cpp"
 #include <string>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -68,6 +70,22 @@ void	Server::init(uint16_t port, const std::string& password) {
 	_pollfdList.push_back(pollfd);
 	std::cout << "server initialized successfully.\n"
 				<< "Port: " << _port << "\n";
+}
+
+void	Server::run(void) {
+	while (_signalReceived == false) {
+		if ((poll(&_pollfdList[0], _pollfdList.size(), 0) == -1) && _signalReceived == false)
+			throw (std::runtime_error("Error: poll()"));
+		for (size_t i = 0; i < _pollfdList.size(); ++i) {
+			if (_pollfdList[i].revents & POLLIN) {
+				if (_pollfdList[i].fd == _serverSocket)
+					_handleNewClient();
+				else
+					_handleReceivedData(_pollfdList[i].fd);
+			}
+		}
+	}
+	closeSockets();
 }
 
 
@@ -144,217 +162,20 @@ void	Server::_handleReceivedData(int clientFd) {
 	for (std::size_t i = 0; i < vLines.size(); ++i) {
 		sLine = _parseLine(vLines[i]);
 		_checkAndExecuteLine(clientFd, sLine);
-		printLine(sLine);
+		_printLine(sLine);
 	}
-	printClient(_clientList[clientFd]);
+	_printClient(_clientList[clientFd]);
 }
 
-bool	Server::_checkAndExecuteLine(int clientFd, const s_Line& sLine) { // change name to checkAndExecuteLine
-	
-	// TODO check if command is known
-	// TODO check if params are good
-	// TODO update registration
-	
-	bool	isValid = false;	
-	
-	if (sLine.command == "PASS")		
-		isValid = _handlePass(clientFd, sLine);
-	else if (sLine.command == "NICK")
-		isValid = _handleNick(clientFd, sLine);
-	else if (sLine.command == "USER")
-		isValid = _handleUser(clientFd, sLine);
-	else if (sLine.command == "JOIN")
-		isValid = _handleJoin(clientFd, sLine);
-	else {
-		std::cout << "send error: ERR_UNKNOWNCOMMAND (421)\n";
-		isValid = false;
-	}	
-	return (isValid);
-}
-
-	/* TODO: FRAMING */ //!done 
-	/* TODO: PARSING */ //!done
-	/* TODO: VALIDATE COMBINAISON */ //? in progress
-	// TODO: EXECUTE 
-	// TODO: REPEAT 
-
-	/*
-		COMMANDS ARRAY
-
-			 PASS
-	- nb params = 1
-	- pre-register allowed = yes
-
-			 NICK
-	- nb params = 1
-	- pre-register allowed = yes
-
-			 USER
-	- nb params = 4
-	- pre-register allowed = yes
-
-				QUIT
-	- nb params = 0
-	- pre-register allowed = yes
-
-	/////////////////////////////////////////////////////////
-
-			 JOIN
-	- nb params = 1
-	- pre-register allowed = no
-
-
-			 PRIVMSG
-	- nb params = 2
-	- pre-register allowed = no
-
-			 PART
-	- nb params = 1
-	- pre-register allowed = no
-
-	*/
-
-std::vector<std::string>	Server::_splitCRLF(int clientFd) {
-
-	std::vector<std::string>	vLines;
-	std::string					line;
-	size_t						posCRLF = std::string::npos;
-	Client*						client;
-
-	client = &_clientList[clientFd];
-	while ((posCRLF = client->bufferIn.find("\r\n")) != std::string::npos) {
-			line = client->bufferIn.substr(0, posCRLF);
-			vLines.push_back(line);
-			client->bufferIn.erase(0, posCRLF + 2);
-	}
-	return (vLines);
-}
-
-std::string	Server::_spaceTrim(const std::string& str) const {
-	std::string	trimmed = str.substr(0);
-	std::size_t i = 0;
-
-	for (; i < trimmed.size(); ++i) {
-		if (trimmed[i] != ' ')
-			break;
-	}
-	trimmed.erase(0, i);
-	if (trimmed.empty())
-		return (trimmed);
-	for (i = (trimmed.size() - 1); i > 0; --i) {
-		if (trimmed[i] != ' ') 
-			break;
-	}
-	std::string	res = trimmed.substr(0, (i + 1));
-	return (res);
-}
-
-std::string	Server::_handlePrefix(std::string& line) {
-	std::string prefix;
-
-	if (!line.empty() && line[0] == ':') {
-		std::size_t	pos = line.find(' ');
-		if (pos == std::string::npos) {
-			prefix = line.substr(1);
-			line.erase(0, line.size());
-		}
-		else {
-			prefix = line.substr(0, pos);
-			prefix.erase(0, 1);
-			line.erase(0, pos);
-		}
-	}
-	return (prefix);	
-}
-
-std::string	Server::_handleCommand(std::string& line) {
-	std::string command;
-
-	int start = 0;
-	
-	while (line[start] == ' ')
-		++start;
-	if (start > 0)
-		line.erase(0, start);
-	if (!line.empty()) {
-		std::size_t	pos = line.find(' ');
-		if (pos == std::string::npos) {
-			command = line.substr();
-			line.erase(0, command.size());
-		}
-		else {
-			command = line.substr(0, pos);
-			line.erase(0, pos);
-		}
-	}
-	return (command);	
-}
-
-std::vector<std::string>	Server::_handleParams(std::string& line) {
-	std::vector<std::string>	params;
-	
-	while (!line.empty()) {
-		int start = 0;
-		
-		while (line[start] == ' ')
-			++start;
-		
-		if (start > 0)
-			line.erase(0, start);
-		
-		if (line.empty())
-			break ;
-		
-		if (line[0] == ':') {
-			params.push_back(line.substr(1));
-			break ;
-		}
-		
-		std::size_t pos = line.find(' ');
-		if (pos == std::string::npos) {
-			params.push_back(line.substr(0, line.size()));
-			break ;
-		}
-		
-		params.push_back(line.substr(0, pos));
-		line.erase(0, pos);
-	}
-	return (params);
+bool	Server::_updateRegisteredState(int clientFd) {
+	Client*	cli = &_clientList[clientFd];
+	cli->setRegirstered((cli->getPassAccepted() || !_passwordEnabled) && cli->hasNick && cli->hasUser);
+	return (cli->getRegirstered());
 }
 
 
-Server::s_Line	Server::_parseLine(const std::string& line) {
-	struct s_Line				sLine;
-	if (line.empty())
-		return (sLine);
-	std::string					lineCpy = _spaceTrim(line.substr(0));
-	
-	sLine.raw = lineCpy;
-	sLine.prefix = _handlePrefix(lineCpy);
-	sLine.command = _handleCommand(lineCpy);
-	sLine.params = _handleParams(lineCpy);
-	return (sLine);
-}
-
-void	Server::_printClients(void) const {
-	for (std::map<int, Client>::const_iterator it = _clientList.begin(); it != _clientList.end(); ++it)
-		std::cout << "client [" << it->first << "] connected at address [" << it->second.ipAddr << "]\n";	
-}
-
-void	Server::run(void) {
-	while (_signalReceived == false) {
-		if ((poll(&_pollfdList[0], _pollfdList.size(), 0) == -1) && _signalReceived == false)
-			throw (std::runtime_error("Error: poll()"));
-		for (size_t i = 0; i < _pollfdList.size(); ++i) {
-			if (_pollfdList[i].revents & POLLIN) {
-				if (_pollfdList[i].fd == _serverSocket)
-					_handleNewClient();
-				else
-					_handleReceivedData(_pollfdList[i].fd);
-			}
-		}
-	}
-	closeSockets();
+void	Server::_cleanupClient(int clientFd) {
+	std::cout << "cleanup client [" << clientFd << "]\n";
 }
 
 void	Server::closeSockets(void) {
@@ -382,106 +203,4 @@ void Server::sighandler(int signum) {
 	else
 	std::cout << "Unknown signal: " << signum << "\n";
 	_signalReceived = true;
-}
-
-bool	Server::_updateRegisteredState(int clientFd) {
-	Client*	cli = &_clientList[clientFd];
-	cli->setRegirstered((cli->getPassAccepted() || !_passwordEnabled) && cli->hasNick && cli->hasUser);
-	return (cli->getRegirstered());
-}
-
-bool	Server::_handlePass(int clientFd, const s_Line& line) {
-	Client*	cli = &_clientList[clientFd];
-	
-	if (line.params.empty()) {
-		std::cout << "send an error:  ERR_NEEDMOREPARAMS (461) \n";
-		return (false); // IGNORE AND CONTINUE
-	}
-	if (cli->getRegirstered()) {
-		std::cout << "send an error: ERR_ALREADYREGISTERED (462)\n";
-		return (false);
-	}
-	if (!_passwordEnabled)
-		return (true);
-	if (line.params[0] == _password) {
-		std::cout << "password accepted\n";
-		cli->setPassAccepted(true);
-	}
-	else {
-		std::cout << "send an error: ERR_PASSWDMISMATCH (464)\n"; 
-		cli->setPassAccepted(false);
-		return (false);
-	}
-	_updateRegisteredState(clientFd);
-	return (true);
-}
-
-
-bool	Server::_handleNick(int clientFd, const s_Line& line) {
-	std::cout << "handle nick command\n";
-
-	if (line.params.empty()) {
-		std::cout << "send error:   ERR_NONICKNAMEGIVEN (431)  \n";
-		return (false);
-	}
-
-	if (isValidNick(line.params[0]) == false)
-		return (std::cout << "send error: ERR_ERRONEUSNICKNAME (432)\n", false);
-		
-	if (isUsedNick(_clientList , line.params[0], clientFd) == true)
-		return (std::cout << "send error: ERR_NICKNAMEINUSE (433)\n", false);
-		
-	_clientList[clientFd].setNickname(line.params[0]);
-	_clientList[clientFd].hasNick = true;
-
-	// TODO: SERVER MUST  SEND TO CLIENTS ACKNOLEDGMENT TO SAY THEIR NICK COMMAND WAS SUCCESSFUL, AND TELL OTHER CLIENTS ABOUT THE CHANGE OF NICKNAME. <source> of the message will be the old nickname 
-	_updateRegisteredState(clientFd);
-	return (true);
-}
-
-bool	Server::_handleUser(int clientFd, const s_Line& line) {
-	std::cout << "handle user command\n";
-	Client* cli = &_clientList[clientFd];
-
-	if (cli->getRegirstered()) {
-		std::cout << "send an error: ERR_ALREADYREGISTERED (462)\n";
-		return (false);
-	}
-	if (line.params.size() < 4 || line.params[0].empty())
-		return (std::cout << "send an error:  ERR_NEEDMOREPARAMS (461) \n", false);
-	cli->setUsername(line.params[0]);
-	cli->setRealname(line.params[3]);
-	cli->hasUser = true;
-	_updateRegisteredState(clientFd);
-	return (true);
-}
-	
-bool	Server::_handleJoin(int clientFd, const s_Line& line) {
-	std::cout << "handle join command\n";
-	(void)clientFd;
-	if (line.params.empty())
-		return (std::cout << "send an error:  ERR_NEEDMOREPARAMS (461) \n", false);
-	// check if valid prefix Chantype (default= '#')	
-	if (line.params[0][0] != '#')
-		return (std::cout << "send error: ERR_NOSUCHCHANNEL (403)\n", false); // in rpl_info tells channel start with '#' ??
-	return (true);
-}
-
-void	Server::_handlePrivmsg(int clientFd, const s_Line& line) const {
-	std::cout << "handle privmsg command\n";
-	(void)clientFd;
-	(void)line;
-}
-void	Server::_handlePart(int clientFd, const s_Line& line) const {
-	std::cout << "handle part command\n";
-	(void)clientFd;
-	(void)line;
-}
-void	Server::_handleQuit(int clientFd, const s_Line& line) const {
-	std::cout << "handle quit command\n";
-	(void)clientFd;
-	(void)line;
-}
-void	Server::_cleanupClient(int clientFd) {
-	std::cout << "cleanup client [" << clientFd << "]\n";
 }

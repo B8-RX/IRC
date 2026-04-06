@@ -11,6 +11,7 @@
 #include "Client.hpp"
 #include "Channel.hpp"
 #include <map>
+
 #define BUFFER_SIZE 1024
 
 class Server {
@@ -37,10 +38,13 @@ class Server {
 			std::string					command;
 			std::vector<std::string>	params;
 		};
+		// std::size_t						clientCount(void);
+		// std::size_t						channelCount(void);
 	private:
 		static bool					_signalReceived;
 		std::string					_password;
 		bool						_passwordEnabled;
+		
 		// structures metier
 		std::map<int, Client>		_clientList; 
 		std::map<int, Channel>		_channelList;
@@ -64,11 +68,9 @@ class Server {
 		std::string					_handleCommand(std::string& line);
 		std::vector<std::string>	_handleParams(std::string& line);
 		
-		// validation
+		// validation/execution
 		bool						_checkAndExecuteLine(int clientFd, const s_Line& sLine);
-		void						_dispatchCommand(int clientFd, s_Line& line);
-		bool						_updateRegisteredState(int clientFd);
-		// execution
+
 		bool						_handlePass(int clientFd, const s_Line& line);
 		bool						_handleNick(int clientFd, const s_Line& line);
 		bool						_handleUser(int clientFd, const s_Line& line);
@@ -77,8 +79,14 @@ class Server {
 		void						_handlePart(int clientFd, const s_Line& line) const;
 		void						_handleQuit(int clientFd, const s_Line& line) const;
 
-		// print
-		void						_printClients(void) const;
-		
-	};
+		// state update
+		bool						_updateRegisteredState(int clientFd);
+
+
+		// utils 
+		void    _printLine(const Server::s_Line& sLine);
+		void    _printClient(const Client& client);
+		bool    _isValidNick(const std::string& nick);
+		bool	_isUsedNick(std::map<int, Client>& ClientsList, const std::string& nick, int clientFd);
+};
 #endif // !SERVER_HPP
