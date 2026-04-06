@@ -159,6 +159,7 @@ void	Server::_handleReceivedData(int clientFd) {
 	
 	vLines = _splitCRLF(clientFd); // extract complete lines
 	
+	// process received data
 	for (std::size_t i = 0; i < vLines.size(); ++i) {
 		sLine = _parseLine(vLines[i]);
 		_checkAndExecuteLine(clientFd, sLine);
@@ -180,14 +181,15 @@ void	Server::_cleanupClient(int clientFd) {
 
 void	Server::closeSockets(void) {
 	std::map<int, Client>::iterator it = _clientList.begin();
-	for (size_t i = 0; i < _clientList.size(); ++i, ++it) {
+	for (; it != _clientList.end(); ++it) {
 		std::cout << "cleanup client [" << it->second.fd << "]\n";
 		close(it->second.fd);
 	}
-	for (size_t i  = 0; i < _channelList.size(); ++i) {
-		std::cout << "cleanup channel [" << _channelList[i].getName() << "]\n";
-		_channelList.erase(i);
-	}
+	// std::map<std::string, Channel>::iterator itc = _channelList.begin();
+	// for (; itc != _channelList.end(); ++itc) {
+	// 	std::cout << "cleanup channel [" << itc->first << "]\n";
+	// 	_channelList.erase(itc);
+	// }
 	if (_serverSocket != -1) {
 		std::cout << "cleanup Sever [" << _serverSocket << "]\n";
 		close(_serverSocket);

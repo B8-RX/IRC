@@ -146,6 +146,33 @@ bool	Server::_handleJoin(int clientFd, const s_Line& line) {
 	if (line.params[0][0] != '#')
 		return (std::cout << "send error: ERR_NOSUCHCHANNEL (403)\n", false); // in rpl_info tells channel start with '#' ??
 	
+    std::string chanName = line.params[0];
+    std::map<std::string, Channel>::iterator chanIt = getChannel(chanName);
+
+    if (chanIt == _channelList.end())
+    {
+        // create channel
+        Channel newChan(chanName);
+        newChan.addMember(clientFd, true);
+        _channelList[chanName] = newChan;
+        cli->addChannelMembership(chanName);
+        // send messages see JOIN part in the modern IRC documentation
+        std::cout << "\n===========================================\n";
+        std::cout << "create channel: [" << chanName << "]\n";
+        std::cout << "first member [" << getClient(clientFd)->second.getNickname() << "]\n";
+        std::cout << "is operator: [" << (newChan.isChanOpMember(clientFd) ? "true" : "false") << "]\n";
+        std::cout << "===========================================\n\n";
+    }
+    else {
+        chanIt->second.addMember(clientFd, false);
+        cli->addChannelMembership(chanName);
+        std::cout << "\n===========================================\n";
+        std::cout << "new member [" << getClient(clientFd)->second.getNickname() << "]\n";
+        std::cout << "join channel: [" << chanName << "]\n";
+        std::cout << "is operator: [" << (chanIt->second.isChanOpMember(clientFd) ? "true" : "false") << "]\n";
+        std::cout << "===========================================\n\n";
+        // send messages see JOIN part in the modern IRC documentation
+    }
 	return (true);
 }
 

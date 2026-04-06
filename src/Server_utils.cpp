@@ -50,3 +50,19 @@ bool    Server::_isUsedNick(std::map<int, Client>& ClientsList, const std::strin
 	}
 	return (false);
 }
+
+std::size_t	Server::clientCount(void) const {
+	return (_clientList.size());
+}
+
+std::size_t	Server::channelCount(void) const {
+	return (_channelList.size());
+}
+
+std::map<int, Client>::iterator	Server::getClient(int clientFd) {
+	return (_clientList.find(clientFd));
+}
+
+std::map<std::string, Channel>::iterator	Server::getChannel(const std::string& name) {
+	return (_channelList.find(name));
+}

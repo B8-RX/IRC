@@ -33,13 +33,15 @@ class Client {
 	bool							setPassAccepted(bool state);
 	bool							setRegirstered(bool state);
 
+	bool							addChannelMembership(const std::string& name);
+
 private:
 	std::string             		_nickname;
 	std::string             		_username;
 	std::string						_realname;
 	bool							_passAccepted;
 	bool                    		_registered;
-	std::map<int, Channel>  		_channels;
+	std::vector<std::string>		_channels;
  };
 
 #endif // !CLIENT_HPP

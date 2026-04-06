@@ -50,3 +50,8 @@ bool    Client::setRegirstered(bool state) {
     _registered = state;
     return (_registered);
 }
+
+bool    Client::addChannelMembership(const std::string& name) {
+    _channels.push_back(name); 
+    return (true);
+}
