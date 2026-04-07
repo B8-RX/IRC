@@ -89,9 +89,10 @@ class Server {
 
 
 		// utils 	
-		void    						_printLine(const Server::s_Line& sLine);
-		void    						_printClient(const Client& client);
-		bool    						_isValidNick(const std::string& nick);
-		bool							_isUsedNick(std::map<int, Client>& ClientsList, const std::string& nick, int clientFd);
+		void    						_printLine(const Server::s_Line& sLine) const;
+		void    						_printClient(const Client& client) const;
+		void							_printChannel(const Channel& channel) const;
+		bool    						_isValidNick(const std::string& nick) const;
+		bool							_isUsedNick(std::map<int, Client>& ClientsList, const std::string& nick, int clientFd) const;
 };
 #endif // !SERVER_HPP

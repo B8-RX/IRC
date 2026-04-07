@@ -94,7 +94,10 @@ std::vector<std::string>	Server::_handleParams(std::string& line) {
 			break ;
 		
 		if (line[0] == ':') {
-			params.push_back(line.substr(1));
+			start = 1;
+			while (line[start] == ' ')
+				++start;
+			params.push_back(line.substr(start));
 			break ;
 		}
 		

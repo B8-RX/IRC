@@ -1,12 +1,10 @@
-
 #include "Channel.hpp"
-#include <string>
 
 Channel::Channel(void) : _name("") {}
 Channel::Channel(const std::string& name) : _name(name) {}
 Channel::~Channel(void) {}
 
-std::string Channel::getName(void) const {
+const std::string& Channel::getName(void) const {
     return (_name);
 }
 
@@ -38,10 +36,14 @@ bool    Channel::removeMember(int memberFd) {
     return (true);
 }
 
-bool    Channel::isChanOpMember(int memberFd) const {
+bool    Channel::isChanOp(int memberFd) const {
     std::map<int, MemberState>::const_iterator it = _members.find(memberFd);
 
     if (it == _members.end())
         return (false);
     return (it->second.isChanOp);
+}
+
+const std::map<int, Channel::MemberState>&   Channel::getMembers(void) const {
+    return (_members);
 }

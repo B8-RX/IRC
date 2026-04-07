@@ -27,13 +27,15 @@ class Client {
 	bool							hasNick;
 	bool							hasUser;
 
-	std::string						setNickname(const std::string&);
-	std::string						setUsername(const std::string&);
-	std::string						setRealname(const std::string&);
+	const std::string&				setNickname(const std::string&);
+	const std::string&				setUsername(const std::string&);
+	const std::string&				setRealname(const std::string&);
 	bool							setPassAccepted(bool state);
 	bool							setRegirstered(bool state);
 
-	bool							addChannelMembership(const std::string& name);
+	bool							addMemberChan(const std::string& name);
+	bool							isMemberChan(const std::string& name) const;
+	const std::vector<std::string>	getSubscribedChannels(void) const;
 
 private:
 	std::string             		_nickname;

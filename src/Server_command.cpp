@@ -69,26 +69,32 @@ bool	Server::_checkAndExecuteLine(int clientFd, const s_Line& sLine) { // change
 	*/
 
 bool	Server::_handlePass(int clientFd, const s_Line& line) {
-	Client*	cli = &_clientList[clientFd];
-	
+
+	// validation 
+
+	if (_clientList[clientFd].getRegirstered()) {
+		std::cout << "send an error: ERR_ALREADYREGISTERED (462)\n";
+		return (false);
+	}
 	if (line.params.empty()) {
 		std::cout << "send an error:  ERR_NEEDMOREPARAMS (461) \n";
 		return (false); // IGNORE AND CONTINUE
 	}
-	if (cli->getRegirstered()) {
-		std::cout << "send an error: ERR_ALREADYREGISTERED (462)\n";
-		return (false);
-	}
-	if (!_passwordEnabled)
-		return (true);
-	if (line.params[0] == _password) {
-		std::cout << "password accepted\n";
-		cli->setPassAccepted(true);
-	}
-	else {
-		std::cout << "send an error: ERR_PASSWDMISMATCH (464)\n"; 
-		cli->setPassAccepted(false);
-		return (false);
+
+	// execution
+
+	Client&	cli = _clientList[clientFd];
+
+	if (_passwordEnabled) {
+		if (line.params[0] == _password) {
+			std::cout << "password accepted\n";
+			cli.setPassAccepted(true);
+		}
+		else {
+			std::cout << "send an error: ERR_PASSWDMISMATCH (464)\n"; 
+			cli.setPassAccepted(false);
+			return (false);
+		}
 	}
 	_updateRegisteredState(clientFd);
 	return (true);
@@ -97,18 +103,22 @@ bool	Server::_handlePass(int clientFd, const s_Line& line) {
 
 bool	Server::_handleNick(int clientFd, const s_Line& line) {
 	std::cout << "handle nick command\n";
+	
+	// validation 
 
 	if (line.params.empty()) {
 		std::cout << "send error:   ERR_NONICKNAMEGIVEN (431)  \n";
 		return (false);
 	}
-
-	if (_isValidNick(line.params[0]) == false)
+	if (_isValidNick(line.params[0]) == false) {
 		return (std::cout << "send error: ERR_ERRONEUSNICKNAME (432)\n", false);
-		
-	if (_isUsedNick(_clientList , line.params[0], clientFd) == true)
+	}
+	if (_isUsedNick(_clientList , line.params[0], clientFd) == true) {
 		return (std::cout << "send error: ERR_NICKNAMEINUSE (433)\n", false);
-		
+	}		
+
+	// execution
+	
 	_clientList[clientFd].setNickname(line.params[0]);
 	_clientList[clientFd].hasNick = true;
 
@@ -119,60 +129,71 @@ bool	Server::_handleNick(int clientFd, const s_Line& line) {
 
 bool	Server::_handleUser(int clientFd, const s_Line& line) {
 	std::cout << "handle user command\n";
-	Client* cli = &_clientList[clientFd];
 
-	if (cli->getRegirstered()) {
+	// validation 
+
+	if (_clientList[clientFd].getRegirstered()) {
 		std::cout << "send an error: ERR_ALREADYREGISTERED (462)\n";
 		return (false);
 	}
-	if (line.params.size() < 4 || line.params[0].empty())
+	if (line.params.size() < 4 || line.params[0].empty()) {
 		return (std::cout << "send an error:  ERR_NEEDMOREPARAMS (461) \n", false);
-	cli->setUsername(line.params[0]);
-	cli->setRealname(line.params[3]);
-	cli->hasUser = true;
+	}
+
+	// execution
+	Client& cli = _clientList[clientFd];
+
+	cli.setUsername(line.params[0]);
+	cli.setRealname(line.params[3]);
+	cli.hasUser = true;
 	_updateRegisteredState(clientFd);
 	return (true);
 }
 	
 bool	Server::_handleJoin(int clientFd, const s_Line& line) {
 	std::cout << "handle join command\n";
-	Client* cli = &_clientList[clientFd];
-
-	if (!cli->getRegirstered())
-		return (std::cout << "send error: ERR_NOTREGISTERED (451)\n", false);
-	if (line.params.empty())
-		return (std::cout << "send an error:  ERR_NEEDMOREPARAMS (461) \n", false);
-	// check if valid prefix Chantype (default= '#')	
-	if (line.params[0][0] != '#')
-		return (std::cout << "send error: ERR_NOSUCHCHANNEL (403)\n", false); // in rpl_info tells channel start with '#' ??
 	
-    std::string chanName = line.params[0];
-    std::map<std::string, Channel>::iterator chanIt = getChannel(chanName);
+	// validation 
+	if (!_clientList[clientFd].getRegirstered()) {
+		return (std::cout << "send error: ERR_NOTREGISTERED (451)\n", false);
+	}
+	if (line.params.empty()) {
+		return (std::cout << "send an error:  ERR_NEEDMOREPARAMS (461) \n", false);
+	}
+	// check if valid prefix Chantype (default= '#') or channel name <= 1 character.	
+	if (line.params[0].size() <= 1 || line.params[0][0] != '#') {
+		return (std::cout << "send error: ERR_BADCHANMASK (476)\n", false); // in rpl_info tells channel start with '#' ??
+	}
 
-    if (chanIt == _channelList.end())
-    {
-        // create channel
-        Channel newChan(chanName);
-        newChan.addMember(clientFd, true);
-        _channelList[chanName] = newChan;
-        cli->addChannelMembership(chanName);
-        // send messages see JOIN part in the modern IRC documentation
-        std::cout << "\n===========================================\n";
-        std::cout << "create channel: [" << chanName << "]\n";
-        std::cout << "first member [" << getClient(clientFd)->second.getNickname() << "]\n";
-        std::cout << "is operator: [" << (newChan.isChanOpMember(clientFd) ? "true" : "false") << "]\n";
-        std::cout << "===========================================\n\n";
-    }
-    else {
-        chanIt->second.addMember(clientFd, false);
-        cli->addChannelMembership(chanName);
-        std::cout << "\n===========================================\n";
-        std::cout << "new member [" << getClient(clientFd)->second.getNickname() << "]\n";
-        std::cout << "join channel: [" << chanName << "]\n";
-        std::cout << "is operator: [" << (chanIt->second.isChanOpMember(clientFd) ? "true" : "false") << "]\n";
-        std::cout << "===========================================\n\n";
-        // send messages see JOIN part in the modern IRC documentation
-    }
+	// execution
+	Client& 									cli = _clientList[clientFd];
+	std::string									chanName = line.params[0];
+	std::map<std::string, Channel>::iterator	chanIt = getChannel(chanName);
+	
+	if (chanIt == _channelList.end()) {
+		chanIt = _channelList.insert(std::make_pair(chanName, Channel(chanName))).first;
+	}
+	Channel& 	chan = chanIt->second;
+	bool		isFirstMember = (chan.memberCount() == 0);
+	if (chan.isMember(clientFd)) {
+		std::cerr << "channel [" << chan.getName() << "]: Client [" << cli.getNickname() << "] is already member of the channel!" << "\n";
+		return (false);
+	}
+	if (!chan.addMember(clientFd, isFirstMember)) {
+		std::cerr << "channel [" << chan.getName() << "]: Error occured. Cannot add member [" << cli.getNickname() << "] to the channel!\n";
+		return (false);
+	}
+	if (!cli.isMemberChan(chanName)) {
+		cli.addMemberChan(chanName);
+	}
+	// std::cout << "\n===========================================\n";
+	// std::cout << "member [" << cli.getNickname() << "]\n";
+	// std::cout << "join channel: [" << chanName << "]\n";
+	// std::cout << "is operator: [" << (chan.isChanOp(clientFd) ? "true" : "false") << "]\n";
+	// std::cout << "===========================================\n\n";
+	
+	// send messages see JOIN part in the modern IRC documentation
+	_printChannel(chan);
 	return (true);
 }
 
