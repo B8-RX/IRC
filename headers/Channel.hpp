@@ -3,16 +3,34 @@
  #define CHANNEL_HPP
 
 #include <string>
-#include "Client.hpp"
+#include <map>
+#include <cstddef>
 
  class Channel {
      public:
         Channel(void);
+        Channel(const std::string& name);
         ~Channel(void);
-        
-        int                     fd;
-        std::string             buffer_in;
-        std::string             buffer_out;
+        struct MemberState {
+            bool    isChanOp;
+            MemberState(void) : isChanOp(false) {}
+            MemberState(bool isOp) : isChanOp(isOp) {}
+        };
+
+        const std::string&                                  getName(void) const;
+        bool                                                empty(void) const;
+        std::size_t                                         memberCount(void) const;
+
+        bool                                                addMember(int memberFd, bool isChanOp);
+        bool                                                removeMember(int memberFd);
+
+        bool                                                isMember(int memberFd) const;
+        bool                                                isChanOp(int memberFd) const;
+        const std::map<int, MemberState>&    getMembers(void) const;
+
+    private:
+        std::string                   _name;
+        std::map<int, MemberState>    _members;
  };
 
 #endif // !CHANNEL_HPP

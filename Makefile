@@ -3,7 +3,7 @@ SRC_DIR = src
 HDR_DIR = headers
 OBJ_DIR = obj
 
-SOURCES = main.cpp $(SRC_DIR)/Server.cpp $(SRC_DIR)/Client.cpp $(SRC_DIR)/Channel.cpp
+SOURCES = main.cpp $(SRC_DIR)/Server.cpp $(SRC_DIR)/Server_parsing.cpp  $(SRC_DIR)/Server_command.cpp $(SRC_DIR)/Server_utils.cpp  $(SRC_DIR)/Client.cpp $(SRC_DIR)/Channel.cpp
 OBJECTS = $(OBJ_DIR)/main.o $(OBJ_DIR)/Server.o $(OBJ_DIR)/Client.o $(OBJ_DIR)/Channel.o
 
 CXX = c++
@@ -16,7 +16,7 @@ all: $(OBJ_DIR) $(NAME)
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
 
-$(OBJ_DIR)/%.o: %.cpp $(HDR_DIR)/Server.hpp $(HDR_DIR)/Client.hpp $(HDR_DIR)/Channel.hpp
+$(OBJ_DIR)/main.o: main.cpp $(HDR_DIR)/Server.hpp $(HDR_DIR)/Client.hpp $(HDR_DIR)/Channel.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp $(HDR_DIR)/Server.hpp $(HDR_DIR)/Client.hpp $(HDR_DIR)/Channel.hpp

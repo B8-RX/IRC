@@ -1,6 +1,9 @@
 #include "Server.hpp"
 #include "Client.hpp"
 #include "Channel.hpp"
+#include "Server_parsing.cpp"
+#include "Server_command.cpp"
+#include "Server_utils.cpp"
 #include <string>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -21,10 +24,14 @@ Server::Server(void) {}
 
 Server::~Server(void) {}
 
-void	Server::init(uint16_t port) {
+void	Server::init(uint16_t port, const std::string& password) {
 	struct pollfd	pollfd;
 	_port = port;
-	
+
+	//* set password state
+	_password = password;
+	_passwordEnabled = !(_password.empty());
+
 	//* create socket internet
 	if ((_serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
 		throw (std::runtime_error("socket: Failed to create socket: " + std::string(strerror(errno))));
@@ -65,6 +72,22 @@ void	Server::init(uint16_t port) {
 				<< "Port: " << _port << "\n";
 }
 
+void	Server::run(void) {
+	while (_signalReceived == false) {
+		if ((poll(&_pollfdList[0], _pollfdList.size(), 0) == -1) && _signalReceived == false)
+			throw (std::runtime_error("Error: poll()"));
+		for (size_t i = 0; i < _pollfdList.size(); ++i) {
+			if (_pollfdList[i].revents & POLLIN) {
+				if (_pollfdList[i].fd == _serverSocket)
+					_handleNewClient();
+				else
+					_handleReceivedData(_pollfdList[i].fd);
+			}
+		}
+	}
+	closeSockets();
+}
+
 
 void	Server::_handleNewClient(void) {
 	Client 			client;
@@ -89,7 +112,6 @@ void	Server::_handleNewClient(void) {
 	newPollfd.revents = 0;
 	client.fd = clientFd;
 	client.ipAddr = inet_ntoa(clientAdd.sin_addr);
-	client.connected = false;
 	_clientList[clientFd] = client;
 	_pollfdList.push_back(newPollfd);
 
@@ -106,8 +128,8 @@ void	Server::_handleReceivedData(int clientFd) {
 	memset(buffer, 0, sizeof(buffer));
 	readBytes = recv(clientFd, buffer, sizeof(buffer), MSG_DONTWAIT);
 	if (readBytes == 0) {
-		//INFO end of line reached or client disconnected. cleanup...
-		//TODO cleanup: remove the client from the channels where he is a member
+		//?INFO: end of line reached or client disconnected. cleanup...
+		//TODO: cleanup: remove the client from the channels where he is a member
 		std::cout << "cleanup client [" << clientFd << "]\n";
 		close(_clientList[clientFd].fd);
 		_clientList.erase(clientFd);
@@ -121,7 +143,7 @@ void	Server::_handleReceivedData(int clientFd) {
 	}
 	else if (readBytes == -1) {
 		if (errno == EAGAIN || errno == EWOULDBLOCK) {
-		// DATA NOT READY AND OPTION O_NONBLOCK IS ENABLED ON THE SOCKET (silently ignored)
+		//?INFO: DATA IS NOT READY AND OPTION O_NONBLOCK IS ENABLED ON THE SOCKET (silently ignored)
 			return ;
 		}
 		else
@@ -130,161 +152,44 @@ void	Server::_handleReceivedData(int clientFd) {
 			return ;
 		}
 	}
-	if (buffer[0] == '\0'){
-		std::cout << "buffer is empty\n";
-		return ;
-	} // ! maybe redondant with readBytes == -1 ??
-
 	_clientList[clientFd].bufferIn.append(buffer, readBytes);
 	
 	struct s_Line				sLine;
 	std::vector<std::string>	vLines;
 	
-	// store the full client input
-	sLine.raw = _clientList[clientFd].bufferIn;
-
-	// split by \r\n to store complete lines in vector
-	vLines = _splitCRLF(clientFd);
+	vLines = _splitCRLF(clientFd); // extract complete lines
 	
+	// process received data
 	for (std::size_t i = 0; i < vLines.size(); ++i) {
-		_parseLine(vLines[i], sLine);
+		sLine = _parseLine(vLines[i]);
+		_checkAndExecuteLine(clientFd, sLine);
+		_printLine(sLine);
 	}
-	std::cout << "bufferIn :[" << sLine.raw << "]\n";
-	
-	// TODO: FRAMING 
-	// TODO: PARSING 
-	// TODO: VALIDATE COMBINAISON 
-	// TODO: EXECUTE 
-	// TODO: REPEAT 
+	_printClient(_clientList[clientFd]);
 }
 
-std::vector<std::string>	Server::_splitCRLF(int clientFd) {
-
-	std::vector<std::string>	vLines;
-	std::string					line;
-	size_t						posCRLF = std::string::npos;
-	Client*						client;
-
-	client = &_clientList[clientFd];
-	// FRAMING (split by each complete lines /r/n ) 
-	while ((posCRLF = client->bufferIn.find("\r\n")) != std::string::npos) {
-			line = client->bufferIn.substr(0, posCRLF);
-			vLines.push_back(line);
-			client->bufferIn.erase(0, posCRLF + 2);
-	}
-	return (vLines);
+bool	Server::_updateRegisteredState(int clientFd) {
+	Client*	cli = &_clientList[clientFd];
+	cli->setRegirstered((cli->getPassAccepted() || !_passwordEnabled) && cli->hasNick && cli->hasUser);
+	return (cli->getRegirstered());
 }
 
-std::string	Server::_spaceTrim(const std::string& str) const {
-	std::string	trimmed = str.substr(0);
-	std::size_t i = 0;
 
-	for (; i < trimmed.size(); ++i) {
-		if (trimmed[i] != ' ')
-			break;
-	}
-	trimmed.erase(0, i);
-	for (i = trimmed.size(); i > 0; --i) {
-		if (trimmed[i] != ' ')
-			break;
-	}
-	std::string	res = trimmed.substr(0, i);
-	return (res);
-}
-
-void	Server::_parseLine(const std::string& line, struct s_Line sLine) {
-	// TODO: Implement line validation logic
-
-	std::cout << "line: [" << line << "]\n";
-	(void)sLine;
-	// if the line is empty, ignore it
-	// if the line start with ':' extract the token as prefix/source
-	// extract the next token as command
-	// split by spaces
-	// while token[0] != ':' push_back the tokens in params[]
-	// if found colon (':') find position of the colon and push_back form (posColon + 1) to line.end() in params() and stop parsing after that parameter.
-	if (line.empty())
-		return;
-	std::string	lineCpy = _spaceTrim(line.substr(0));
-	// std::cout << "test trim: [" << lineCpy << "]\n";
-	
-	std::size_t i;
-
-	if (lineCpy[0] == ':') {
-		for (std::size_t j = 0; j < lineCpy.size(); ++j) {
-			if (lineCpy[j] == ' ') {
-				sLine.prefix = lineCpy.substr(0, j);
-				break;
-			}
-		}
-		i = sLine.prefix.size();
-	}
-	else {
-		for (std::size_t j = 0; j < lineCpy.size(); ++j) {
-			if (lineCpy[j] == ' ') {
-				sLine.command = lineCpy.substr(0, j);
-				break;
-			}
-		}
-		i = sLine.command.size();
-	}
-	for (; i < lineCpy.size(); ++i) {
-		if (lineCpy[i] == ':')
-				sLine.params.push_back(_spaceTrim(lineCpy.substr(i)));
-		else {
-			for (std::size_t j = 0; (j + i) < lineCpy.size(); ++j) {
-				if (lineCpy[j + i] == ' ') {
-					sLine.params.push_back(_spaceTrim(lineCpy.substr(i, j + i)));
-					i += j;
-					break;
-				}
-			}
-		}
-	}
-
-	std::cout << "prefix: [" << (sLine.prefix.empty() ? "" : sLine.prefix) << "]\n";
-
-	std::cout << "command: [" << (sLine.command.empty() ? "" : sLine.command) << "]\n";
-
-	std::cout << "params: \n";
-	for (std::size_t i = 0; i < sLine.params.size(); ++i) {
-		std::cout << "[" << sLine.params[i] << "]\n";
-	}
-
-}
-
-void	Server::_printClients(void) const {
-	for (std::map<int, Client>::const_iterator it = _clientList.begin(); it != _clientList.end(); ++it)
-		std::cout << "client [" << it->first << "] connected at address [" << it->second.ipAddr << "]\n";	
-}
-
-void	Server::run(void) {
-	while (_signalReceived == false) {
-		if ((poll(&_pollfdList[0], _pollfdList.size(), 0) == -1) && _signalReceived == false)
-			throw (std::runtime_error("Error: poll()"));
-		for (size_t i = 0; i < _pollfdList.size(); ++i) {
-			if (_pollfdList[i].revents & POLLIN) {
-				if (_pollfdList[i].fd == _serverSocket)
-					_handleNewClient();
-				else
-					_handleReceivedData(_pollfdList[i].fd);
-			}
-		}
-	}
-	closeSockets();
+void	Server::_cleanupClient(int clientFd) {
+	std::cout << "cleanup client [" << clientFd << "]\n";
 }
 
 void	Server::closeSockets(void) {
 	std::map<int, Client>::iterator it = _clientList.begin();
-	for (size_t i = 0; i < _clientList.size(); ++i, ++it) {
+	for (; it != _clientList.end(); ++it) {
 		std::cout << "cleanup client [" << it->second.fd << "]\n";
 		close(it->second.fd);
 	}
-	for (size_t i  = 0; i < _channelList.size(); ++i) {
-		std::cout << "cleanup channel [" << _channelList[i].fd << "]\n";
-		close(_channelList[i].fd);
-		_channelList.erase(i);
-	}
+	// std::map<std::string, Channel>::iterator itc = _channelList.begin();
+	// for (; itc != _channelList.end(); ++itc) {
+	// 	std::cout << "cleanup channel [" << itc->first << "]\n";
+	// 	_channelList.erase(itc);
+	// }
 	if (_serverSocket != -1) {
 		std::cout << "cleanup Sever [" << _serverSocket << "]\n";
 		close(_serverSocket);

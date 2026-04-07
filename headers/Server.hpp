@@ -11,6 +11,8 @@
 #include "Client.hpp"
 #include "Channel.hpp"
 #include <map>
+#include <utility>
+
 #define BUFFER_SIZE 1024
 
 class Server {
@@ -18,12 +20,12 @@ class Server {
 		Server(void);
 		~Server(void);
 		static void	sighandler(int signum);
-		void	init(uint16_t port);
+		void	init(uint16_t port, const std::string& password);
 		void	run(void);
 		void	closeSockets(void);
 		class	ErrorException : public std::exception {
 			private:
-				std::string			_message;
+				std::string				_message;
 			public:
 				ErrorException(const std::string& message) : _message(message) {}
 				virtual ~ErrorException() throw() {}
@@ -31,25 +33,66 @@ class Server {
 					return (_message.c_str());
 				}
 		};
-	private:
 		struct s_Line {
 			std::string					raw;
 			std::string					prefix;
 			std::string					command;
 			std::vector<std::string>	params;
 		};
-		static bool					_signalReceived;
-		std::map<int, Client>		_clientList; 
-		std::map<int, Channel>		_channelList;
-		std::vector<struct pollfd>	_pollfdList;
-		uint16_t					_port;
-		sockaddr_in					_serverAddress;
-		int							_serverSocket;
-		void						_handleNewClient(void);
-		void						_handleReceivedData(int client_socket);
-		std::vector<std::string>	_splitCRLF(int client_socket);
-		void						_parseLine(const std::string& line, struct s_Line sLine);
-		void						_printClients(void) const;
-		std::string					_spaceTrim(const std::string& line) const;
-	};
+
+		std::size_t									clientCount(void) const;
+		std::size_t									channelCount(void) const;
+		std::map<int, Client>::iterator				getClient(int clienFd);
+		std::map<std::string, Channel>::iterator	getChannel(const std::string& name);
+
+	private:
+		static bool						_signalReceived;
+		std::string						_password;
+		bool							_passwordEnabled;
+
+		// structures metier	
+		std::map<int, Client>			_clientList; 
+		std::map<std::string, Channel>	_channelList;
+
+		// reseau	
+		uint16_t						_port;
+		std::vector<struct pollfd>		_pollfdList;
+		sockaddr_in						_serverAddress;
+		int								_serverSocket;
+		void							_handleNewClient(void);
+		void							_handleReceivedData(int clientFd);
+		void							_cleanupClient(int clinetFd);
+
+		// helper framing/parsing	
+		std::vector<std::string>		_splitCRLF(int clientFd);
+		std::string						_spaceTrim(const std::string& line) const;
+
+		// parsing	
+		struct s_Line					_parseLine(const std::string& line);
+		std::string						_handlePrefix(std::string& line);
+		std::string						_handleCommand(std::string& line);
+		std::vector<std::string>		_handleParams(std::string& line);
+
+		// validation/execution	
+		bool							_checkAndExecuteLine(int clientFd, const s_Line& sLine);
+
+		bool							_handlePass(int clientFd, const s_Line& line);
+		bool							_handleNick(int clientFd, const s_Line& line);
+		bool							_handleUser(int clientFd, const s_Line& line);
+		bool							_handleJoin(int clientFd, const s_Line& line);
+		void							_handlePrivmsg(int clientFd, const s_Line& line) const;
+		void							_handlePart(int clientFd, const s_Line& line) const;
+		void							_handleQuit(int clientFd, const s_Line& line) const;
+
+		// state update	
+		bool							_updateRegisteredState(int clientFd);
+
+
+		// utils 	
+		void    						_printLine(const Server::s_Line& sLine) const;
+		void    						_printClient(const Client& client) const;
+		void							_printChannel(const Channel& channel) const;
+		bool    						_isValidNick(const std::string& nick) const;
+		bool							_isUsedNick(std::map<int, Client>& ClientsList, const std::string& nick, int clientFd) const;
+};
 #endif // !SERVER_HPP
