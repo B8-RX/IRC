@@ -17,10 +17,10 @@
 
 class Server {
 	public:
-		Server(void);
+		Server(uint16_t port, const std::string& password);
 		~Server(void);
 		static void	sighandler(int signum);
-		void	init(uint16_t port, const std::string& password);
+		void	init(void);
 		void	run(void);
 		void	closeSockets(void);
 		class	ErrorException : public std::exception {
@@ -46,9 +46,10 @@ class Server {
 		std::map<std::string, Channel>::iterator	getChannel(const std::string& name);
 
 	private:
-		static bool						_signalReceived;
+		std::string						_serverName;
 		std::string						_password;
 		bool							_passwordEnabled;
+		static bool						_signalReceived;
 
 		// structures metier	
 		std::map<int, Client>			_clientList; 
@@ -63,6 +64,18 @@ class Server {
 		void							_handleReceivedData(int clientFd);
 		void							_cleanupClient(int clinetFd);
 
+		// messaging
+		void							_sendToClient(int clientFd, const std::string& message) const;
+		void							_sendUnregistered(int clienFd, const std::string& nick);
+		void							_sendUnknownCommand(int clientFd, const std::string& nick, const std::string& cmd);
+		void							_sendNeedMoreParams(int clientFd, const std::string& nick, const std::string& cmd);
+		void							_sendAlreadyRegistered(int clientFd, const std::string& nick);
+		void							_sendPassMisMatch(int clienFd, const std::string& nick);
+		void							_sendNoNickNameGiven(int clienFd, const std::string& nick);
+		void							_sendErrOnUseNickName(int clienFd, const std::string& nick, const s_Line& line);
+		void							_sendNickNameInUse(int clienFd, const std::string& nick, const s_Line& line);
+		void							_sendErrBadChanMask(int clientFd, const std::string& nick, const std::string& channel) const;
+		
 		// helper framing/parsing	
 		std::vector<std::string>		_splitCRLF(int clientFd);
 		std::string						_spaceTrim(const std::string& line) const;
@@ -80,9 +93,10 @@ class Server {
 		bool							_handleNick(int clientFd, const s_Line& line);
 		bool							_handleUser(int clientFd, const s_Line& line);
 		bool							_handleJoin(int clientFd, const s_Line& line);
-		void							_handlePrivmsg(int clientFd, const s_Line& line) const;
-		void							_handlePart(int clientFd, const s_Line& line) const;
-		void							_handleQuit(int clientFd, const s_Line& line) const;
+		bool							_handlePrivmsg(int clientFd, const s_Line& line);
+		bool							_handlePart(int clientFd, const s_Line& line);
+		bool							_handleQuit(int clientFd, const s_Line& line);
+		bool							_handlePing(int clientFd, const s_Line& line);
 
 		// state update	
 		bool							_updateRegisteredState(int clientFd);

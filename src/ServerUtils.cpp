@@ -2,6 +2,9 @@
 #include "Client.hpp"
 #include "Channel.hpp"
 #include <iostream>
+#include <cerrno>
+#include <cstring>
+
 
 void    Server::_printLine(const Server::s_Line& sLine) const {
 	std::cout << "raw line: [" << sLine.raw << "]\n";
@@ -71,19 +74,70 @@ bool    Server::_isUsedNick(std::map<int, Client>& ClientsList, const std::strin
 	}
 	return (false);
 }
-
-std::size_t	Server::clientCount(void) const {
-	return (_clientList.size());
+void	Server::_sendToClient(int clientFd, const std::string& message) const {
+	std::string	line = message + "\r\n";
+	ssize_t 	sent = send(clientFd, line.c_str(), line.size(), 0);
+	if (sent == -1) {
+		if (errno == EAGAIN || errno == EWOULDBLOCK) {
+			std::cout << "errno -> EAGAIN/EWOULDBLOCK catched\n";
+		}
+		std::cerr << "send(): Cannot send to client\n";
+		std::cerr << std::string(strerror(errno)) << "\n";
+	}
 }
 
-std::size_t	Server::channelCount(void) const {
-	return (_channelList.size());
+void	Server::_sendUnknownCommand(int clientFd, const std::string& nick, const std::string& cmd){
+		std::string	numeric = " 421 ";
+		std::string line = ":" + _serverName + numeric + nick + " " + cmd + " :Unknown command"; 
+		_sendToClient(clientFd, line);
+}
+	
+void	Server::_sendNeedMoreParams(int clientFd, const std::string& nick, const std::string& cmd){
+		std::string	numeric = " 461 ";
+		std::string line = ":" + _serverName + numeric + nick + " " + cmd + " :Not enough parameters"; 
+		_sendToClient(clientFd, line);
 }
 
-std::map<int, Client>::iterator				Server::getClient(int clientFd) {
-	return (_clientList.find(clientFd));
+void	Server::_sendAlreadyRegistered(int clientFd, const std::string& nick){
+		std::string	numeric = " 462 ";
+		std::string line = ":" + _serverName + numeric + nick + " :You may not reregister"; 
+		_sendToClient(clientFd, line);
+}	
+
+void	Server::_sendUnregistered(int clientFd, const std::string& nick){
+		std::string	numeric = " 451 ";
+		std::string line = ":" + _serverName + numeric + nick + " :You have not registered"; 
+		_sendToClient(clientFd, line);
 }
 
-std::map<std::string, Channel>::iterator	Server::getChannel(const std::string& name) {
-	return (_channelList.find(name));
+void	Server::_sendPassMisMatch(int clientFd, const std::string& nick){
+		std::string	numeric = " 464 ";
+		std::string line = ":" + _serverName + numeric + nick + " :Password incorrect"; 
+		_sendToClient(clientFd, line);
+}
+
+void	Server::_sendNoNickNameGiven(int clientFd, const std::string& nick){
+		std::string	numeric = " 431 ";
+		std::string line = ":" + _serverName + numeric + nick + " :No nickname given"; 
+		_sendToClient(clientFd, line);
+}
+
+void	Server::_sendErrOnUseNickName(int clientFd, const std::string& nick, const s_Line& sline) {
+		std::string	numeric = " 432 ";
+		std::string badNick = sline.params[0];
+		std::string line = ":" + _serverName + numeric + nick + " " + badNick + " :Erroneus nickname"; 
+		_sendToClient(clientFd, line);
+}
+
+void	Server::_sendNickNameInUse(int clientFd, const std::string& nick, const s_Line& sline) {
+		std::string	numeric = " 433 ";
+		std::string badNick = sline.params[0];
+		std::string line = ":" + _serverName + numeric + nick + " " + badNick + " :Nickname is already in use"; 
+		_sendToClient(clientFd, line);
+}
+
+void	Server::_sendErrBadChanMask(int clientFd, const std::string& nick, const std::string& channel) const {
+		std::string	numeric = " 476 ";
+		std::string line = ":" + _serverName + numeric + nick + " " + channel + " :Bad Channel Mask"; 
+		_sendToClient(clientFd, line);
 }

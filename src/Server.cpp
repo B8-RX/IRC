@@ -1,9 +1,9 @@
 #include "Server.hpp"
 #include "Client.hpp"
 #include "Channel.hpp"
-#include "Server_parsing.cpp"
-#include "Server_command.cpp"
-#include "Server_utils.cpp"
+#include "ServerParsing.cpp"
+#include "ServerCommands.cpp"
+#include "ServerUtils.cpp"
 #include <string>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -20,18 +20,13 @@
 
 bool Server::_signalReceived = false;
 
-Server::Server(void) {}
+Server::Server(uint16_t port, const std::string& password) : _serverName("irc.local"), _password(password), _passwordEnabled(!(_password.empty())), _port(port) {}
 
 Server::~Server(void) {}
 
-void	Server::init(uint16_t port, const std::string& password) {
+void	Server::init(void) {
 	struct pollfd	pollfd;
-	_port = port;
-
-	//* set password state
-	_password = password;
-	_passwordEnabled = !(_password.empty());
-
+	
 	//* create socket internet
 	if ((_serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
 		throw (std::runtime_error("socket: Failed to create socket: " + std::string(strerror(errno))));
@@ -174,7 +169,6 @@ bool	Server::_updateRegisteredState(int clientFd) {
 	return (cli->getRegirstered());
 }
 
-
 void	Server::_cleanupClient(int clientFd) {
 	std::cout << "cleanup client [" << clientFd << "]\n";
 }
@@ -206,3 +200,21 @@ void Server::sighandler(int signum) {
 	std::cout << "Unknown signal: " << signum << "\n";
 	_signalReceived = true;
 }
+
+
+std::size_t	Server::clientCount(void) const {
+	return (_clientList.size());
+}
+
+std::size_t	Server::channelCount(void) const {
+	return (_channelList.size());
+}
+
+std::map<int, Client>::iterator				Server::getClient(int clientFd) {
+	return (_clientList.find(clientFd));
+}
+
+std::map<std::string, Channel>::iterator	Server::getChannel(const std::string& name) {
+	return (_channelList.find(name));
+}
+
