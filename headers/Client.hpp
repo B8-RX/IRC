@@ -36,6 +36,7 @@ class Client {
 	bool							addMemberChan(const std::string& name);
 	bool							isMemberChan(const std::string& name) const;
 	const std::vector<std::string>	getSubscribedChannels(void) const;
+	bool							removeSubscribedChannel(const std::string& channel);
 
 private:
 	std::string             		_nickname;

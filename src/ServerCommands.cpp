@@ -2,36 +2,40 @@
 #include "Client.hpp"
 #include <iostream>
 
-bool	Server::_checkAndExecuteLine(int clientFd, const s_Line& sLine) { // change name to checkAndExecuteLine
+bool	Server::_checkAndExecuteLine(int clientFd, const s_Line& sLine) {
 	
+	std::string clientNick = (_clientList[clientFd].getNickname().empty() ? "*" : _clientList[clientFd].getNickname());
 	
 	if (sLine.command == "PASS") {
-		_handlePass(clientFd, sLine);
+		return (_handlePass(clientFd, sLine));
 	}
 	else if (sLine.command == "NICK") {
-		_handleNick(clientFd, sLine);
+		return (_handleNick(clientFd, sLine));
 	}
 	else if (sLine.command == "USER") {
-		_handleUser(clientFd, sLine);
-	}
-	else if (sLine.command == "JOIN") {
-		_handleJoin(clientFd, sLine);
+		return (_handleUser(clientFd, sLine));
 	}
 	else if (sLine.command == "PING") {
-		_handlePing(clientFd, sLine);
+		return (_handlePing(clientFd, sLine));
 	}
 	else if (sLine.command == "PONG") {
 		return (true);
 	}
-	else {
-		std::cout << "match else. command =[" << sLine.command << "]\n";
-		std::string clientNick = (_clientList[clientFd].getNickname().empty() ? "*" : _clientList[clientFd].getNickname());
-		if (_clientList[clientFd].getRegirstered()) {	
-			_sendUnknownCommand(clientFd, clientNick , sLine.command); // << ERR_UNKNOWNCOMMAND (421) "<client> <command> :Unknown command"
+	else if (_clientList[clientFd].getRegirstered()) {
+		
+		if (sLine.command == "JOIN") {
+			return (_handleJoin(clientFd, sLine));
+		}
+		else if (sLine.command == "PART") {
+			return (_handlePart(clientFd, sLine));
 		}
 		else {
-			_sendUnregistered(clientFd, clientNick); // ERR_NOTREGISTERED (451)  "<client> :You have not registered"
+			_sendErrUnknownCommand(clientFd, clientNick , sLine.command);
+			return (false);
 		}
+	}
+	else {
+		_sendErrUnregistered(clientFd, clientNick);
 		return (false);
 	}	
 	return (true);
@@ -42,11 +46,11 @@ bool	Server::_handlePass(int clientFd, const s_Line& line) {
 	// validation 
 	std::string clientNick = (_clientList[clientFd].getNickname().empty() ? "*" : _clientList[clientFd].getNickname());
 	if (_clientList[clientFd].getRegirstered()) {
-		_sendAlreadyRegistered(clientFd, clientNick); // ERR_ALREADYREGISTERED (462) "<client> :You may not reregister"
+		_sendErrAlreadyRegistered(clientFd, clientNick); 
 		return (false);
 	}
 	if (line.params.empty()) {
-		_sendNeedMoreParams(clientFd, clientNick, line.command); // ERR_NEEDMOREPARAMS (461) "<client> <command> :Not enough parameters"
+		_sendErrNeedMoreParams(clientFd, clientNick, line.command); 
 		return (false);
 	}
 	
@@ -59,8 +63,7 @@ bool	Server::_handlePass(int clientFd, const s_Line& line) {
 			cli.setPassAccepted(true);
 		}
 		else {
-			_sendPassMisMatch(clientFd, clientNick); // ERR_PASSWDMISMATCH (464) "<client> :Password incorrect"
-			
+			_sendErrPassMisMatch(clientFd, clientNick);
 			cli.setPassAccepted(false);
 			return (false);
 		}
@@ -76,18 +79,16 @@ bool	Server::_handleNick(int clientFd, const s_Line& line) {
 	
 	std::string clientNick = (_clientList[clientFd].getNickname().empty() ? "*" : _clientList[clientFd].getNickname());
 	if (line.params.empty()) {
-		_sendNoNickNameGiven(clientFd, clientNick); // ERR_NONICKNAMEGIVEN (431)  "<client> :No nickname given"
+		_sendErrNoNickNameGiven(clientFd, clientNick);
 		return (false);
 	}
 	if (_isValidNick(line.params[0]) == false) {
 		_sendErrOnUseNickName(clientFd, clientNick, line);
-		return (false); //  ERR_ERRONEUSNICKNAME (432) "<client> <nick> :Erroneus nickname"
-
+		return (false); 
 	}
 	if (_isUsedNick(_clientList , line.params[0], clientFd) == true) {
-		_sendNickNameInUse(clientFd, clientNick, line);
-		return (false); // ERR_NICKNAMEINUSE (433)  "<client> <nick> :Nickname is already in use"
-
+		_sendErrNickNameInUse(clientFd, clientNick, line);
+		return (false); 
 	}		
 
 	// execution
@@ -107,11 +108,11 @@ bool	Server::_handleUser(int clientFd, const s_Line& line) {
 	std::string clientNick = (_clientList[clientFd].getNickname().empty() ? "*" : _clientList[clientFd].getNickname());
 	
 	if (line.params.size() < 4 || line.params[0].empty()) {
-		_sendNeedMoreParams(clientFd, clientNick, line.command); // ERR_NEEDMOREPARAMS (461) "<client> <command> :Not enough parameters"
+		_sendErrNeedMoreParams(clientFd, clientNick, line.command); 
 		return (false);
 	}
 	if (_clientList[clientFd].getRegirstered()) {
-		_sendAlreadyRegistered(clientFd, clientNick); // ERR_ALREADYREGISTERED (462) "<client> :You may not reregister"
+		_sendErrAlreadyRegistered(clientFd, clientNick); 
 		return (false);
 	}
 	
@@ -125,62 +126,114 @@ bool	Server::_handleUser(int clientFd, const s_Line& line) {
 	return (true);
 }
 
-bool	Server::_handleJoin(int clientFd, const s_Line& line) {
+bool	Server::_handleJoin(int clientFd, const s_Line& sline) {
 	
 	// validation 
 
 	std::string clientNick = (_clientList[clientFd].getNickname().empty() ? "*" : _clientList[clientFd].getNickname());
-	if (!_clientList[clientFd].getRegirstered()) {
-		_sendUnregistered(clientFd, clientNick); // ERR_NOTREGISTERED (451)  "<client> :You have not registered"
-		return (false);
-	}
-	if (line.params.empty()) {
-		_sendNeedMoreParams(clientFd, clientNick, line.command); // ERR_NEEDMOREPARAMS (461) "<client> <command> :Not enough parameters"
+	if (sline.params.empty()) {
+		_sendErrNeedMoreParams(clientFd, clientNick, sline.command);
 		return (false);
 	}
 	// check if valid prefix Chantype (default= '#') or channel name <= 1 character.	
-	if (line.params[0].size() <= 1 || line.params[0][0] != '#') {
-		_sendErrBadChanMask(clientFd, clientNick, line.params[0]);
-		return (false); // ERR_BADCHANMASK (476)  "<client> <channel> :Bad Channel Mask"  . in rpl_infos tells channel start with '#'
+	if (sline.params[0].size() <= 1 || sline.params[0][0] != '#') {
+		_sendErrBadChanMask(clientFd, clientNick, sline.params[0]);
+		return (false);
 	}
-
-	// execution
-	Client& 									cli = _clientList[clientFd];
-	std::string									chanName = line.params[0];
-	std::map<std::string, Channel>::iterator	chanIt = getChannel(chanName);
 	
-	if (chanIt == _channelList.end()) {
-		chanIt = _channelList.insert(std::make_pair(chanName, Channel(chanName))).first;
+	std::string chanParam = sline.params[0];
+	Client& 									cli = _clientList[clientFd];
+
+	while (!chanParam.empty()) {
+		std::size_t commaPos = chanParam.find(',');
+		std::string 								chanName;
+		if (commaPos == std::string::npos)
+		{
+			chanName = chanParam;
+			chanParam.clear();
+		}
+		else {
+			chanName = chanParam.substr(0, commaPos);
+			chanParam.erase(0, commaPos + 1);
+		}
+		if (chanName.empty()) {
+			continue;
+		}
+		Channel& 	chan = getChannel(chanName);
+		bool		isFirstMember = (chan.memberCount() == 0);
+		
+		if (chan.isMember(clientFd)) {
+			std::cerr << "channel [" << chan.getName() << "]: Client [" << cli.getNickname() << "] is already member of the channel!" << "\n";
+			return (false);
+		}
+		if (!chan.addMember(clientFd, isFirstMember)) {
+			std::cerr << "channel [" << chan.getName() << "]: Error occured. Cannot add member [" << cli.getNickname() << "] to the channel!\n";
+			return (false);
+		}
+		if (!cli.isMemberChan(chanName)) {
+			cli.addMemberChan(chanName);
+		}
+		// send messages see JOIN part in the modern IRC documentation
+		_printChannel(chan);
+		//!TODO handle multiple keys (sline.params[1]) separated by colon see documentation of JOIN cmd.
+			
 	}
-	Channel& 	chan = chanIt->second;
-	bool		isFirstMember = (chan.memberCount() == 0);
-	if (chan.isMember(clientFd)) {
-		std::cerr << "channel [" << chan.getName() << "]: Client [" << cli.getNickname() << "] is already member of the channel!" << "\n";
-		return (false);
-	}
-	if (!chan.addMember(clientFd, isFirstMember)) {
-		std::cerr << "channel [" << chan.getName() << "]: Error occured. Cannot add member [" << cli.getNickname() << "] to the channel!\n";
-		return (false);
-	}
-	if (!cli.isMemberChan(chanName)) {
-		cli.addMemberChan(chanName);
-	}
-	// send messages see JOIN part in the modern IRC documentation
-	_printChannel(chan);
 	return (true);
 }
 
-bool	Server::_handlePrivmsg(int clientFd, const s_Line& line) {
-	std::cout << "handle privmsg command\n";
-	(void)clientFd;
-	(void)line;
-	return (true);
-}
-
-bool	Server::_handlePart(int clientFd, const s_Line& line) {
-	std::cout << "handle part command\n";
-	(void)clientFd;
-	(void)line;
+bool	Server::_handlePart(int clientFd, const s_Line& sline) {
+	std::string	clientNick =_clientList[clientFd].getNickname();
+	
+	if (clientNick.empty()) {
+		clientNick = "*";
+	}
+	if (sline.params.empty()) {
+		_sendErrNeedMoreParams(clientFd, clientNick, sline.command);
+		return (false);
+	}
+	std::string chanParam = sline.params[0];
+	std::string reason = (sline.params.size() > 1 ? sline.params[1] : "");
+	while (!chanParam.empty())
+	{
+		std::size_t commaPos = chanParam.find(',');
+		std::string 								chanName;
+		if (commaPos == std::string::npos)
+		{
+			chanName = chanParam;
+			chanParam.clear();
+		}
+		else {
+			chanName = chanParam.substr(0, commaPos);
+			chanParam.erase(0, commaPos + 1);
+		}
+		if (chanName.empty())
+			continue;
+		std::map<std::string, Channel>::iterator	channelIt = _channelList.find(chanName);
+		std::map<int, Client>::iterator				client = _clientList.find(clientFd);
+		if (channelIt != _channelList.end()) {
+			if (channelIt->second.isMember(clientFd)) {
+				const std::map<int, Channel::MemberState>&	chanMembers = channelIt->second.getMembers();
+				std::map<int, Channel::MemberState>::const_iterator membersIt = chanMembers.begin();
+				for (; membersIt != chanMembers.end(); ++membersIt) {
+					std::string line = ":" + clientNick + " " + sline.command + " " + chanName + (reason.empty() ? "" : (" :" + reason)); 
+					_sendToClient(membersIt->first, line);
+				}
+				channelIt->second.removeMember(clientFd);
+				client->second.removeSubscribedChannel(chanName);
+				_printChannel(channelIt->second);
+				if (channelIt->second.empty()) {
+					_channelList.erase(channelIt);
+					std::cout << "channel [" << chanName << "] have 0 member. Channel have been deleted successfully.\n";
+				}
+			}
+			else {
+				_sendErrNotOnChannel(clientFd, clientNick, chanName);
+			}
+		}
+		else {
+			_sendErrNoSuchChannel(clientFd, clientNick, chanName);
+		}
+	}
 	return (true);
 }
 
@@ -191,11 +244,18 @@ bool	Server::_handleQuit(int clientFd, const s_Line& line) {
 	return (true);
 }
 
+bool	Server::_handlePrivmsg(int clientFd, const s_Line& line) {
+	std::cout << "handle privmsg command\n";
+	(void)clientFd;
+	(void)line;
+	return (true);
+}
+
 bool	Server::_handlePing(int clientFd, const s_Line& sline) {
 	std::string clientNick = (_clientList[clientFd].getNickname().empty() ? "*" : _clientList[clientFd].getNickname());
 	
 	if (sline.params.empty()) {
-		_sendNeedMoreParams(clientFd, clientNick, sline.command);
+		_sendErrNeedMoreParams(clientFd, clientNick, sline.command);
 		return (false);
 	}
 	std::string line = ":" + _serverName + " PONG " + _serverName + " " + sline.params[0];

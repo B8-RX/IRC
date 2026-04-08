@@ -214,7 +214,10 @@ std::map<int, Client>::iterator				Server::getClient(int clientFd) {
 	return (_clientList.find(clientFd));
 }
 
-std::map<std::string, Channel>::iterator	Server::getChannel(const std::string& name) {
-	return (_channelList.find(name));
+Channel&	Server::getChannel(const std::string& name) {
+	if (_channelList.find(name) == _channelList.end()) {
+		_channelList.insert(std::make_pair(name, Channel(name)));
+	}
+	return (_channelList.find(name)->second);
 }
 

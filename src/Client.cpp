@@ -65,3 +65,18 @@ bool    Client::isMemberChan(const std::string& name) const {
 const std::vector<std::string>	Client::getSubscribedChannels(void) const {
     return (_channels);
 }
+
+bool    Client::removeSubscribedChannel(const std::string& target) {
+    std::vector<std::string>::iterator it = _channels.begin();
+
+    for (; it != _channels.end(); ++it) {
+        if (*it == target) {
+            break;
+        }
+    }
+    if (it == _channels.end()) {
+        return (false);
+    }
+    _channels.erase(it);
+    return (true);
+}

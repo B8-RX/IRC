@@ -43,7 +43,7 @@ class Server {
 		std::size_t									clientCount(void) const;
 		std::size_t									channelCount(void) const;
 		std::map<int, Client>::iterator				getClient(int clienFd);
-		std::map<std::string, Channel>::iterator	getChannel(const std::string& name);
+		Channel&									getChannel(const std::string& name); // if not found the channel it will create one
 
 	private:
 		std::string						_serverName;
@@ -66,15 +66,17 @@ class Server {
 
 		// messaging
 		void							_sendToClient(int clientFd, const std::string& message) const;
-		void							_sendUnregistered(int clienFd, const std::string& nick);
-		void							_sendUnknownCommand(int clientFd, const std::string& nick, const std::string& cmd);
-		void							_sendNeedMoreParams(int clientFd, const std::string& nick, const std::string& cmd);
-		void							_sendAlreadyRegistered(int clientFd, const std::string& nick);
-		void							_sendPassMisMatch(int clienFd, const std::string& nick);
-		void							_sendNoNickNameGiven(int clienFd, const std::string& nick);
+		void							_sendErrUnregistered(int clienFd, const std::string& nick);
+		void							_sendErrUnknownCommand(int clientFd, const std::string& nick, const std::string& cmd);
+		void							_sendErrNeedMoreParams(int clientFd, const std::string& nick, const std::string& cmd);
+		void							_sendErrAlreadyRegistered(int clientFd, const std::string& nick);
+		void							_sendErrPassMisMatch(int clienFd, const std::string& nick);
+		void							_sendErrNoNickNameGiven(int clienFd, const std::string& nick);
 		void							_sendErrOnUseNickName(int clienFd, const std::string& nick, const s_Line& line);
-		void							_sendNickNameInUse(int clienFd, const std::string& nick, const s_Line& line);
+		void							_sendErrNickNameInUse(int clienFd, const std::string& nick, const s_Line& line);
 		void							_sendErrBadChanMask(int clientFd, const std::string& nick, const std::string& channel) const;
+		void							_sendErrNoSuchChannel(int clientFd, const std::string& nick, const std::string& channel) const;
+		void							_sendErrNotOnChannel(int clientFd, const std::string& nick, const std::string& channel) const;
 		
 		// helper framing/parsing	
 		std::vector<std::string>		_splitCRLF(int clientFd);

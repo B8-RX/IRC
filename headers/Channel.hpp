@@ -26,7 +26,7 @@
 
         bool                                                isMember(int memberFd) const;
         bool                                                isChanOp(int memberFd) const;
-        const std::map<int, MemberState>&    getMembers(void) const;
+        const std::map<int, MemberState>&                   getMembers(void) const;
 
     private:
         std::string                   _name;
