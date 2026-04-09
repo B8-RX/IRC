@@ -37,6 +37,9 @@ bool	Server::_dispatchCommand(int clientFd, const s_Line& sLine) {
 		else if (sLine.command == "PART") {
 			return (_handlePart(clientFd, sLine));
 		}
+		else if (sLine.command == "PRIVMSG") {
+			return (_handlePrivmsg(clientFd, sLine));
+		}
 		else {
 			_sendErrUnknownCommand(clientFd, clientNick , sLine.command);
 			return (false);
@@ -85,7 +88,7 @@ bool	Server::_handlePass(int clientFd, const s_Line& line) {
 }
 
 
-bool	Server::_handleNick(int clientFd, const s_Line& line) {
+bool	Server::_handleNick(int clientFd, const s_Line& sline) {
 	
 	// validation 
 	
@@ -94,22 +97,22 @@ bool	Server::_handleNick(int clientFd, const s_Line& line) {
 	if (clientNick.empty()) {
 		clientNick = "*";
 	}
-	if (line.params.empty()) {
+	if (sline.params.empty()) {
 		_sendErrNoNickNameGiven(clientFd, clientNick);
 		return (false);
 	}
-	if (_isValidNick(line.params[0]) == false) {
-		_sendErrOnUseNickName(clientFd, clientNick, line);
+	if (_isValidNick(sline.params[0]) == false) {
+		_sendErrOnUseNickName(clientFd, clientNick, sline.params[0]);
 		return (false); 
 	}
-	if (_isUsedNick(_clientList , line.params[0], clientFd) == true) {
-		_sendErrNickNameInUse(clientFd, clientNick, line);
+	if (_isUsedNick(_clientList , sline.params[0], clientFd) == true) {
+		_sendErrNickNameInUse(clientFd, clientNick, sline.params[0]);
 		return (false); 
 	}		
 
 	// execution
 	
-	_clientList[clientFd].setNickname(line.params[0]);
+	_clientList[clientFd].setNickname(sline.params[0]);
 	_clientList[clientFd].hasNick = true;
 
 
@@ -314,14 +317,6 @@ bool	Server::_handleQuit(int clientFd, const s_Line& sline) {
 	return (true);
 }
 
-
-bool	Server::_handlePrivmsg(int clientFd, const s_Line& line) {
-	std::cout << "handle privmsg command\n";
-	(void)clientFd;
-	(void)line;
-	return (true);
-}
-
 bool	Server::_handlePing(int clientFd, const s_Line& sline) {
 	std::string clientNick = (_clientList[clientFd].getNickname().empty() ? "*" : _clientList[clientFd].getNickname());
 	
@@ -332,4 +327,86 @@ bool	Server::_handlePing(int clientFd, const s_Line& sline) {
 	std::string line = ":" + _serverName + " PONG " + _serverName + " " + sline.params[0];
 	_sendToClient(clientFd, line);
 	return (true);
+}
+
+bool	Server::_handlePrivmsg(int clientFd, const s_Line& sline) {
+	std::map<int, Client>::iterator	clientIt = _clientList.find(clientFd);
+	if (clientIt == _clientList.end()) {
+		return (false);
+	}
+	Client& cli = clientIt->second;
+	std::string clientNick = (cli.getNickname().empty() ? "*" : cli.getNickname());
+	std::string clientUsername = (cli.getUsername().empty() ? "*" : cli.getUsername());
+	
+	if (sline.params.empty()) {
+		_sendErrNoRecipient(clientFd, clientNick, sline.command);
+		return (false);
+	}
+	if (sline.params.size() < 2 || sline.params[1].empty()) {
+		_sendErrNoTextToSend(clientFd, clientNick);
+		return (false);
+	}
+	bool		sendAtLeastOne = false;
+	std::string targetParam = sline.params[0];
+	std::string message = sline.params[1];
+	std::string prefix = ":" + clientNick + "!" + clientUsername + "@" + cli.ipAddr;
+	
+	// to handle multi target ex: #chan1,#chan2... split on every comma ',' until the end
+	while (!targetParam.empty()) {
+		std::size_t	commaPos = targetParam.find(',');
+		std::string targetName;
+		if (commaPos == std::string::npos) {
+			targetName = targetParam;
+			targetParam.clear();
+		}
+		else {
+			targetName = targetParam.substr(0, commaPos);
+			targetParam.erase(0, commaPos + 1);
+		}
+		if (targetName.empty()) {
+			continue;
+		}
+		
+		// construct the full message
+
+		std::string ret = prefix + " PRIVMSG " + targetName + " :" + message;
+		
+		if (targetName[0] != '#') {
+			// check if client exist
+			std::map<int, Client>::iterator usertIt = getUserByNick(targetName);
+			if (usertIt == _clientList.end()) {
+				_sendErrNoSuchNick(clientFd, clientNick, targetName);
+				continue;
+			}
+			// send the message to targetName
+			_sendToClient(usertIt->second.fd, ret);
+			sendAtLeastOne = true;
+		}
+		else {
+			// check if channel exist
+			std::map<std::string, Channel>::iterator chanIt = _channelList.find(targetName);
+			if (chanIt == _channelList.end()) {
+				_sendErrNoSuchChannel(clientFd, clientNick, targetName);
+				continue;
+			}
+			Channel& chan = chanIt->second; 
+			// check if client is member
+			if (!chan.isMember(clientFd)) {
+				_sendErrCannotSendToChan(clientFd, clientNick, targetName);
+				continue;
+			}
+			// send the message
+			const std::map<int, Channel::MemberState>& members = chan.getMembers();
+			std::map<int, Channel::MemberState>::const_iterator membersIt = members.begin();
+			for (; membersIt != members.end(); ++membersIt) {
+				if (membersIt->first == clientFd) {
+					continue;
+				}
+				_sendToClient(membersIt->first, ret);
+				sendAtLeastOne = true;
+			}
+		}
+	}
+	// if the targe is a user and the user is not connected send RPL_AWAY (301)
+	return (sendAtLeastOne);
 }

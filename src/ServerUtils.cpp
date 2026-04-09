@@ -86,70 +86,92 @@ void	Server::_sendToClient(int clientFd, const std::string& message) const {
 	}
 }
 
-void	Server::_sendErrUnknownCommand(int clientFd, const std::string& nick, const std::string& cmd){
+void	Server::_sendErrUnknownCommand(int clientFd, const std::string& nick, const std::string& cmd) const {
 		std::string	numeric = " 421 ";
 		std::string line = ":" + _serverName + numeric + nick + " " + cmd + " :Unknown command"; 
 		_sendToClient(clientFd, line);
 }
 	
-void	Server::_sendErrNeedMoreParams(int clientFd, const std::string& nick, const std::string& cmd){
+void	Server::_sendErrNeedMoreParams(int clientFd, const std::string& nick, const std::string& cmd) const {
 		std::string	numeric = " 461 ";
 		std::string line = ":" + _serverName + numeric + nick + " " + cmd + " :Not enough parameters"; 
 		_sendToClient(clientFd, line);
 }
 
-void	Server::_sendErrAlreadyRegistered(int clientFd, const std::string& nick){
+void	Server::_sendErrAlreadyRegistered(int clientFd, const std::string& nick) const {
 		std::string	numeric = " 462 ";
 		std::string line = ":" + _serverName + numeric + nick + " :You may not reregister"; 
 		_sendToClient(clientFd, line);
 }	
 
-void	Server::_sendErrUnregistered(int clientFd, const std::string& nick){
+void	Server::_sendErrUnregistered(int clientFd, const std::string& nick) const {
 		std::string	numeric = " 451 ";
 		std::string line = ":" + _serverName + numeric + nick + " :You have not registered"; 
 		_sendToClient(clientFd, line);
 }
 
-void	Server::_sendErrPassMisMatch(int clientFd, const std::string& nick){
+void	Server::_sendErrPassMisMatch(int clientFd, const std::string& nick) const {
 		std::string	numeric = " 464 ";
 		std::string line = ":" + _serverName + numeric + nick + " :Password incorrect"; 
 		_sendToClient(clientFd, line);
 }
 
-void	Server::_sendErrNoNickNameGiven(int clientFd, const std::string& nick){
+void	Server::_sendErrNoNickNameGiven(int clientFd, const std::string& nick) const {
 		std::string	numeric = " 431 ";
 		std::string line = ":" + _serverName + numeric + nick + " :No nickname given"; 
 		_sendToClient(clientFd, line);
 }
 
-void	Server::_sendErrOnUseNickName(int clientFd, const std::string& nick, const s_Line& sline) {
+void	Server::_sendErrOnUseNickName(int clientFd, const std::string& nick, const std::string& target)  const {
 		std::string	numeric = " 432 ";
-		std::string badNick = sline.params[0];
-		std::string line = ":" + _serverName + numeric + nick + " " + badNick + " :Erroneus nickname"; 
+		std::string line = ":" + _serverName + numeric + nick + " " + target + " :Erroneus nickname"; 
 		_sendToClient(clientFd, line);
 }
 
-void	Server::_sendErrNickNameInUse(int clientFd, const std::string& nick, const s_Line& sline) {
+void	Server::_sendErrNickNameInUse(int clientFd, const std::string& nick, const std::string& target)  const {
 		std::string	numeric = " 433 ";
-		std::string badNick = sline.params[0];
-		std::string line = ":" + _serverName + numeric + nick + " " + badNick + " :Nickname is already in use"; 
+		std::string line = ":" + _serverName + numeric + nick + " " + target + " :Nickname is already in use"; 
 		_sendToClient(clientFd, line);
 }
 
 void	Server::_sendErrBadChanMask(int clientFd, const std::string& nick, const std::string& channel) const {
-		std::string	numeric = " 476 ";
-		std::string line = ":" + _serverName + numeric + nick + " " + channel + " :Bad Channel Mask"; 
-		_sendToClient(clientFd, line);
+	std::string	numeric = " 476 ";
+	std::string line = ":" + _serverName + numeric + nick + " " + channel + " :Bad Channel Mask"; 
+	_sendToClient(clientFd, line);
 }
 
 void	Server::_sendErrNotOnChannel(int clientFd, const std::string& nick, const std::string& channel) const {
-		std::string	numeric = " 442 ";
-		std::string line = ":" + _serverName + numeric + nick + " " + channel + " :You're not on that channel"; 
-		_sendToClient(clientFd, line);
+	std::string	numeric = " 442 ";
+	std::string line = ":" + _serverName + numeric + nick + " " + channel + " :You're not on that channel"; 
+	_sendToClient(clientFd, line);
 }
 
 void	Server::_sendErrNoSuchChannel(int clientFd, const std::string& nick, const std::string& channel) const {
-		std::string	numeric = " 403 ";
-		std::string line = ":" + _serverName + numeric + nick + " " + channel + " :No such channel"; 
+	std::string	numeric = " 403 ";
+	std::string line = ":" + _serverName + numeric + nick + " " + channel + " :No such channel"; 
+	_sendToClient(clientFd, line);
+}
+
+void	Server::_sendErrNoRecipient(int clientFd, const std::string& nick, const std::string& cmd) const {
+		std::string	numeric = " 411 ";
+		std::string line = ":" + _serverName + numeric + nick + " :No recipient given (" + cmd + ")"; 
+		_sendToClient(clientFd, line);
+}
+
+void	Server::_sendErrNoTextToSend(int clientFd, const std::string& nick) const {
+		std::string	numeric = " 413 ";
+		std::string line = ":" + _serverName + numeric + nick + " :No text to send"; 
+		_sendToClient(clientFd, line);
+}
+
+void	Server::_sendErrNoSuchNick(int clientFd, const std::string& nick, const std::string& target) const {
+		std::string	numeric = " 401 ";
+		std::string line = ":" + _serverName + numeric + nick + " " + target + " :No such nick/channel"; 
+		_sendToClient(clientFd, line);
+}
+
+void	Server::_sendErrCannotSendToChan(int clientFd, const std::string& nick, const std::string& target) const {
+		std::string	numeric = " 404 ";
+		std::string line = ":" + _serverName + numeric + nick + " " + target + " :Cannot send to channel"; 
 		_sendToClient(clientFd, line);
 }

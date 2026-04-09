@@ -260,6 +260,16 @@ std::map<int, Client>::iterator				Server::getClient(int clientFd) {
 	return (_clientList.find(clientFd));
 }
 
+std::map<int, Client>::iterator				Server::getUserByNick(const std::string& nick) {
+	std::map<int, Client>::iterator it = _clientList.begin();
+	for (; it != _clientList.end(); ++it) {
+		if (it->second.getNickname() == nick) {
+			return (it);
+		}
+	}
+	return (_clientList.end());
+}
+
 std::map<std::string, Channel>::iterator	Server::getChannelIt(const std::string& name) {
 	return (_channelList.find(name));
 }
