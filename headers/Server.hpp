@@ -43,7 +43,7 @@ class Server {
 		std::size_t									clientCount(void) const;
 		std::size_t									channelCount(void) const;
 		std::map<int, Client>::iterator				getClient(int clienFd);
-		Channel&									getChannel(const std::string& name); // if not found the channel it will create one
+		std::map<std::string, Channel>::iterator	getChannelIt(const std::string& name);
 
 	private:
 		std::string						_serverName;
@@ -89,7 +89,7 @@ class Server {
 		std::vector<std::string>		_handleParams(std::string& line);
 
 		// validation/execution	
-		bool							_checkAndExecuteLine(int clientFd, const s_Line& sLine);
+		bool							_dispatchCommand(int clientFd, const s_Line& sLine);
 
 		bool							_handlePass(int clientFd, const s_Line& line);
 		bool							_handleNick(int clientFd, const s_Line& line);
@@ -107,7 +107,7 @@ class Server {
 		// utils 	
 		void    						_printLine(const Server::s_Line& sLine) const;
 		void    						_printClient(const Client& client) const;
-		void							_printChannel(const Channel& channel) const;
+		void							_printChannel(Channel& channel) const;
 		bool    						_isValidNick(const std::string& nick) const;
 		bool							_isUsedNick(std::map<int, Client>& ClientsList, const std::string& nick, int clientFd) const;
 };

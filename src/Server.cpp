@@ -157,10 +157,12 @@ void	Server::_handleReceivedData(int clientFd) {
 	// process received data
 	for (std::size_t i = 0; i < vLines.size(); ++i) {
 		sLine = _parseLine(vLines[i]);
-		_checkAndExecuteLine(clientFd, sLine);
+		_dispatchCommand(clientFd, sLine);
 		_printLine(sLine);
 	}
-	_printClient(_clientList[clientFd]);
+	if (_clientList.find(clientFd) != _clientList.end()) {
+		_printClient(_clientList[clientFd]);
+	}
 }
 
 bool	Server::_updateRegisteredState(int clientFd) {
@@ -170,14 +172,58 @@ bool	Server::_updateRegisteredState(int clientFd) {
 }
 
 void	Server::_cleanupClient(int clientFd) {
-	std::cout << "cleanup client [" << clientFd << "]\n";
+
+	std::vector<std::string>	cliChannels = _clientList.find(clientFd)->second.getSubscribedChannels();
+	
+	// boucler sur la liste des channels dont le client est membre
+	for (std::size_t i = 0; i < cliChannels.size(); ++i) {
+		
+		// recuperer le channel
+		std::string			chanName = cliChannels[i];
+		std::map<std::string, Channel>::iterator chanIt = _channelList.find(chanName);
+		if (chanIt == _channelList.end()) {
+			continue;
+		} 
+		Channel&			channel = chanIt->second;
+
+		// retirer le client de la liste des membres du channel
+		channel.removeMember(clientFd);
+		
+		// supprimer le channel si vide
+		if (channel.empty()) {
+			_channelList.erase(chanIt);
+		}
+	}
+	
+	// retirer la structure poll qui surveillait les events sur le socket du client
+	for (std::size_t i = 0; i < _pollfdList.size(); ++i) {
+		if (_pollfdList[i].fd == clientFd) {
+			_pollfdList.erase(_pollfdList.begin() + i);
+			break;
+		}
+	}
+	
+	// fermer le socket
+	if (clientFd != -1) {
+		std::cout << "cleanup client [" << clientFd << "]\n";
+		close(clientFd);
+	}
+	
+	// retirer le client de la liste des clients du serveur
+	std::map<int, Client>::iterator cliIt = _clientList.find(clientFd);
+	if (cliIt != _clientList.end()) {
+		_clientList.erase(cliIt);
+	}
+	
 }
 
 void	Server::closeSockets(void) {
 	std::map<int, Client>::iterator it = _clientList.begin();
 	for (; it != _clientList.end(); ++it) {
 		std::cout << "cleanup client [" << it->second.fd << "]\n";
-		close(it->second.fd);
+		if (it->second.fd != -1) {
+			close(it->second.fd);
+		}
 	}
 	// std::map<std::string, Channel>::iterator itc = _channelList.begin();
 	// for (; itc != _channelList.end(); ++itc) {
@@ -214,10 +260,7 @@ std::map<int, Client>::iterator				Server::getClient(int clientFd) {
 	return (_clientList.find(clientFd));
 }
 
-Channel&	Server::getChannel(const std::string& name) {
-	if (_channelList.find(name) == _channelList.end()) {
-		_channelList.insert(std::make_pair(name, Channel(name)));
-	}
-	return (_channelList.find(name)->second);
+std::map<std::string, Channel>::iterator	Server::getChannelIt(const std::string& name) {
+	return (_channelList.find(name));
 }
 

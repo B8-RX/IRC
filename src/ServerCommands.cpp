@@ -1,11 +1,16 @@
 #include "Server.hpp"
 #include "Client.hpp"
 #include <iostream>
+#include <set>
 
-bool	Server::_checkAndExecuteLine(int clientFd, const s_Line& sLine) {
+bool	Server::_dispatchCommand(int clientFd, const s_Line& sLine) {
 	
-	std::string clientNick = (_clientList[clientFd].getNickname().empty() ? "*" : _clientList[clientFd].getNickname());
-	
+	std::string clientNick = _clientList[clientFd].getNickname();
+
+	if (clientNick.empty()) {
+		clientNick = "*";
+	}
+
 	if (sLine.command == "PASS") {
 		return (_handlePass(clientFd, sLine));
 	}
@@ -20,6 +25,9 @@ bool	Server::_checkAndExecuteLine(int clientFd, const s_Line& sLine) {
 	}
 	else if (sLine.command == "PONG") {
 		return (true);
+	}
+	else if (sLine.command == "QUIT") {
+		return (_handleQuit(clientFd, sLine));
 	}
 	else if (_clientList[clientFd].getRegirstered()) {
 		
@@ -44,7 +52,11 @@ bool	Server::_checkAndExecuteLine(int clientFd, const s_Line& sLine) {
 bool	Server::_handlePass(int clientFd, const s_Line& line) {
 
 	// validation 
-	std::string clientNick = (_clientList[clientFd].getNickname().empty() ? "*" : _clientList[clientFd].getNickname());
+	std::string clientNick = _clientList[clientFd].getNickname();
+
+	if (clientNick.empty()) {
+		clientNick = "*";
+	}
 	if (_clientList[clientFd].getRegirstered()) {
 		_sendErrAlreadyRegistered(clientFd, clientNick); 
 		return (false);
@@ -77,7 +89,11 @@ bool	Server::_handleNick(int clientFd, const s_Line& line) {
 	
 	// validation 
 	
-	std::string clientNick = (_clientList[clientFd].getNickname().empty() ? "*" : _clientList[clientFd].getNickname());
+	std::string clientNick = _clientList[clientFd].getNickname();
+
+	if (clientNick.empty()) {
+		clientNick = "*";
+	}
 	if (line.params.empty()) {
 		_sendErrNoNickNameGiven(clientFd, clientNick);
 		return (false);
@@ -105,8 +121,11 @@ bool	Server::_handleNick(int clientFd, const s_Line& line) {
 bool	Server::_handleUser(int clientFd, const s_Line& line) {
 
 	// validation 
-	std::string clientNick = (_clientList[clientFd].getNickname().empty() ? "*" : _clientList[clientFd].getNickname());
-	
+	std::string clientNick = _clientList[clientFd].getNickname();
+
+	if (clientNick.empty()) {
+		clientNick = "*";
+	}	
 	if (line.params.size() < 4 || line.params[0].empty()) {
 		_sendErrNeedMoreParams(clientFd, clientNick, line.command); 
 		return (false);
@@ -130,23 +149,20 @@ bool	Server::_handleJoin(int clientFd, const s_Line& sline) {
 	
 	// validation 
 
-	std::string clientNick = (_clientList[clientFd].getNickname().empty() ? "*" : _clientList[clientFd].getNickname());
-	if (sline.params.empty()) {
+	std::string clientNick = _clientList[clientFd].getNickname();
+
+	if (clientNick.empty()) {
+		clientNick = "*";
+	}	if (sline.params.empty()) {
 		_sendErrNeedMoreParams(clientFd, clientNick, sline.command);
 		return (false);
 	}
-	// check if valid prefix Chantype (default= '#') or channel name <= 1 character.	
-	if (sline.params[0].size() <= 1 || sline.params[0][0] != '#') {
-		_sendErrBadChanMask(clientFd, clientNick, sline.params[0]);
-		return (false);
-	}
-	
 	std::string chanParam = sline.params[0];
-	Client& 									cli = _clientList[clientFd];
+	Client& 	cli = _clientList[clientFd];
 
 	while (!chanParam.empty()) {
 		std::size_t commaPos = chanParam.find(',');
-		std::string 								chanName;
+		std::string	chanName;
 		if (commaPos == std::string::npos)
 		{
 			chanName = chanParam;
@@ -159,7 +175,14 @@ bool	Server::_handleJoin(int clientFd, const s_Line& sline) {
 		if (chanName.empty()) {
 			continue;
 		}
-		Channel& 	chan = getChannel(chanName);
+		if (chanName.size() <= 1 || chanName[0] != '#') {
+			_sendErrBadChanMask(clientFd, clientNick, chanName);
+			continue;
+		}
+		if (_channelList.find(chanName) == _channelList.end()) {
+			_channelList.insert(std::make_pair(chanName, Channel(chanName)));
+		}
+		Channel& chan = _channelList[chanName]; 
 		bool		isFirstMember = (chan.memberCount() == 0);
 		
 		if (chan.isMember(clientFd)) {
@@ -215,7 +238,8 @@ bool	Server::_handlePart(int clientFd, const s_Line& sline) {
 				const std::map<int, Channel::MemberState>&	chanMembers = channelIt->second.getMembers();
 				std::map<int, Channel::MemberState>::const_iterator membersIt = chanMembers.begin();
 				for (; membersIt != chanMembers.end(); ++membersIt) {
-					std::string line = ":" + clientNick + " " + sline.command + " " + chanName + (reason.empty() ? "" : (" :" + reason)); 
+					std::string prefix = ":" + clientNick + "!" + client->second.getUsername() + "@" + client->second.ipAddr;
+					std::string line = prefix + " " + sline.command + " " + chanName + (reason.empty() ? "" : (" :" + reason)); 
 					_sendToClient(membersIt->first, line);
 				}
 				channelIt->second.removeMember(clientFd);
@@ -237,12 +261,59 @@ bool	Server::_handlePart(int clientFd, const s_Line& sline) {
 	return (true);
 }
 
-bool	Server::_handleQuit(int clientFd, const s_Line& line) {
-	std::cout << "handle quit command\n";
-	(void)clientFd;
-	(void)line;
+// client send QUIT command to quit the server
+bool	Server::_handleQuit(int clientFd, const s_Line& sline) {
+	std::map<int, Client>::iterator itcli = _clientList.find(clientFd);
+	if (itcli == _clientList.end()) {
+		return (false);
+	} 
+	typedef std::map<int, Channel::MemberState> ChannelMembersMap;
+	Client& 					client = itcli->second;
+	std::string					reason = (sline.params.empty() ? "" : sline.params[0]); 
+
+	// construct the notification message
+	std::string					nick = client.getNickname().empty() ? "*" : client.getNickname();
+	std::string					username = client.getUsername().empty() ? "*" : client.getUsername(); 
+	std::string					prefix = ":" + nick + "!" + username + "@" + client.ipAddr;
+	std::string					line = prefix + " " + sline.command + " :Quit:" + (reason.empty() ? "" : " " + reason);
+
+
+	std::vector<std::string>	cliChannels = client.getSubscribedChannels();
+	std::set<int>				listMembersToNotify;
+
+	// loop on the client's channel list
+	for (std::size_t i = 0; i < cliChannels.size(); ++i) {
+		std::string			chanName = cliChannels[i];
+		std::map<std::string, Channel>::iterator chanIt = _channelList.find(chanName);
+		if (chanIt == _channelList.end()) {
+			continue;
+		}
+		Channel&			channel = chanIt->second;
+		ChannelMembersMap& 	members = channel.getMembers();
+
+		// create list of the members to notify 
+		// with a unique key container std::set<int>,
+		//  to only send the msg once even if the member shares > 1 channel with the quitting member
+		ChannelMembersMap::const_iterator it = members.begin();
+		for (; it != members.end(); ++it) {
+			if (it->first == clientFd) {
+				continue;
+			}
+			listMembersToNotify.insert(it->first);
+		}
+	}
+	// send QUIT notification to the members on the list of the members to notify
+	for (std::set<int>::iterator it = listMembersToNotify.begin(); it != listMembersToNotify.end(); ++it) {
+		_sendToClient(*it, line);
+	}
+	// send a QUIT acknowledgement to the client
+	_sendToClient(clientFd, "ERROR :Closing Link: Quit:" + (reason.empty() ? "" : " " + reason));
+	
+	// clean the client from the server and close his socket
+	_cleanupClient(clientFd);
 	return (true);
 }
+
 
 bool	Server::_handlePrivmsg(int clientFd, const s_Line& line) {
 	std::cout << "handle privmsg command\n";

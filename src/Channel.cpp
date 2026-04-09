@@ -44,6 +44,16 @@ bool    Channel::isChanOp(int memberFd) const {
     return (it->second.isChanOp);
 }
 
-const std::map<int, Channel::MemberState>&   Channel::getMembers(void) const {
+std::map<int, Channel::MemberState>&   Channel::getMembers(void) {
     return (_members);
 }
+
+// void    Channel::notifyQuit(int memberFd, const std::string& msg) const {
+//     std::map<int, MemberState>::const_iterator  it = _members.begin();
+//     for (; it != _members.end(); ++it) {
+//         if (it->first == memberFd) {
+//             continue;
+//         }
+        
+//     }
+// }

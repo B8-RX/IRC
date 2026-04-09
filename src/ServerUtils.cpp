@@ -36,11 +36,11 @@ void    Server::_printClient(const Client& client) const {
 	std::cout << "|| || || ||\n";
 }
 
-void	Server::_printChannel(const Channel& channel) const {
+void	Server::_printChannel(Channel& channel) const {
 	std::cout << "\n|| Channel Info ||\n";
 	std::cout << "channel name: [" << (channel.getName().empty() ? "" : channel.getName()) << "]\n";
 	std::cout << "Channels members: [";
-	std::map<int, Channel::MemberState> members = channel.getMembers();
+	std::map<int, Channel::MemberState>& members = channel.getMembers();
 	std::map<int, Channel::MemberState>::const_iterator it = members.begin();
 	for (std::size_t i = 0; it != members.end(); ++it, ++i) {
 		std::map<int, Client>::const_iterator itc = _clientList.find(it->first);

@@ -62,7 +62,7 @@ bool    Client::isMemberChan(const std::string& name) const {
     }
     return (false);
 }
-const std::vector<std::string>	Client::getSubscribedChannels(void) const {
+const std::vector<std::string>&	Client::getSubscribedChannels(void) const {
     return (_channels);
 }
 
