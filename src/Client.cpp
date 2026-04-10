@@ -7,6 +7,10 @@ std::string Client::getNickname(void) const {
     return (_nickname);
 }
 
+std::string Client::getOldNickname(void) const {
+    return (_oldNickname);
+}
+
 std::string Client::getUsername(void) const {
     return (_username);
 }
@@ -26,6 +30,11 @@ bool    Client::getRegirstered(void) const {
 const std::string& Client::setNickname(const std::string& nick) {
     _nickname = nick;
     hasNick = true;
+    return (_nickname);
+}
+
+const std::string& Client::setOldNickname(const std::string& nick) {
+    _oldNickname = nick;
     return (_nickname);
 }
 

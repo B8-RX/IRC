@@ -13,38 +13,31 @@
 #include <map>
 #include <utility>
 
+#define RED "\033[31m"
+#define GREEN "\033[32m"
+#define YELLOW "\033[33m"
+#define RESET "\033[0m"
+
 #define BUFFER_SIZE 1024
 
 class Server {
 	public:
 		Server(uint16_t port, const std::string& password);
 		~Server(void);
-		static void	sighandler(int signum);
 		void	init(void);
 		void	run(void);
-		void	closeSockets(void);
-		class	ErrorException : public std::exception {
-			private:
-				std::string				_message;
-			public:
-				ErrorException(const std::string& message) : _message(message) {}
-				virtual ~ErrorException() throw() {}
-				virtual const char* what() const throw() {
-					return (_message.c_str());
-				}
-		};
+		
+		std::size_t									clientCount(void) const;
+		std::size_t									channelCount(void) const;
+		Client*										getClient(int clienFd);
+		Client*										getUserByNick(const std::string& nick);
+		Channel*									getChannel(const std::string& name);
 		struct s_Line {
 			std::string					raw;
 			std::string					prefix;
 			std::string					command;
 			std::vector<std::string>	params;
 		};
-
-		std::size_t									clientCount(void) const;
-		std::size_t									channelCount(void) const;
-		std::map<int, Client>::iterator				getClient(int clienFd);
-		std::map<int, Client>::iterator				getUserByNick(const std::string& nick);
-		std::map<std::string, Channel>::iterator	getChannelIt(const std::string& name);
 
 	private:
 		std::string						_serverName;
@@ -63,7 +56,8 @@ class Server {
 		int								_serverSocket;
 		void							_handleNewClient(void);
 		void							_handleReceivedData(int clientFd);
-		void							_cleanupClient(int clinetFd);
+		void							_cleanupClient(const Client& cli);
+		void							_closeServer(void);
 
 		// messaging
 		void							_sendToClient(int clientFd, const std::string& message) const;
@@ -104,15 +98,32 @@ class Server {
 		bool							_handleQuit(int clientFd, const s_Line& line);
 		bool							_handlePing(int clientFd, const s_Line& line);
 		bool							_handlePrivmsg(int clientFd, const s_Line& line);
+		bool							_handleKick(int clientFd, const s_Line& line);
 
 		// state update	
 		bool							_updateRegisteredState(int clientFd);
-
+		
 		// utils 	
+		void							_printLogSucces(const std::string& type, const s_Line& sline, const Client& cli);
+		void							_printLogDebug(const std::string& type, const std::string& message) const;
 		void    						_printLine(const Server::s_Line& sLine) const;
 		void    						_printClient(const Client& client) const;
 		void							_printChannel(Channel& channel) const;
+		void							_printServerInfo(void) const;
 		bool    						_isValidNick(const std::string& nick) const;
 		bool							_isUsedNick(std::map<int, Client>& ClientsList, const std::string& nick, int clientFd) const;
+
+	public:
+		static void	sighandler(int signum);
+		class	ErrorException : public std::exception {
+			private:
+				std::string				_message;
+			public:
+				ErrorException(const std::string& message) : _message(message) {}
+				virtual ~ErrorException() throw() {}
+				virtual const char* what() const throw() {
+					return (_message.c_str());
+				}
+		};
 };
 #endif // !SERVER_HPP

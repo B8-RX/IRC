@@ -40,6 +40,9 @@ bool	Server::_dispatchCommand(int clientFd, const s_Line& sLine) {
 		else if (sLine.command == "PRIVMSG") {
 			return (_handlePrivmsg(clientFd, sLine));
 		}
+		else if (sLine.command == "KICK") {
+			return (_handleKick(clientFd, sLine));
+		}
 		else {
 			_sendErrUnknownCommand(clientFd, clientNick , sLine.command);
 			return (false);
@@ -91,8 +94,12 @@ bool	Server::_handlePass(int clientFd, const s_Line& line) {
 bool	Server::_handleNick(int clientFd, const s_Line& sline) {
 	
 	// validation 
-	
-	std::string clientNick = _clientList[clientFd].getNickname();
+	Client*	pCli = getClient(clientFd);
+
+	if (pCli == false) {
+		return (false);
+	}
+	std::string clientNick = pCli->getNickname();
 
 	if (clientNick.empty()) {
 		clientNick = "*";
@@ -111,12 +118,15 @@ bool	Server::_handleNick(int clientFd, const s_Line& sline) {
 	}		
 
 	// execution
-	
-	_clientList[clientFd].setNickname(sline.params[0]);
-	_clientList[clientFd].hasNick = true;
-
-
+	if (pCli->hasNick) {
+		pCli->setOldNickname(pCli->getNickname());
+	}
 	// TODO: SERVER MUST  SEND TO CLIENTS ACKNOLEDGMENT TO SAY THEIR NICK COMMAND WAS SUCCESSFUL, AND TELL OTHER CLIENTS ABOUT THE CHANGE OF NICKNAME. <source> of the message will be the old nickname 
+
+	pCli->setNickname(sline.params[0]);
+	pCli->hasNick = true;
+
+	
 	_updateRegisteredState(clientFd);
 	return (true);
 }
@@ -208,11 +218,11 @@ bool	Server::_handleJoin(int clientFd, const s_Line& sline) {
 }
 
 bool	Server::_handlePart(int clientFd, const s_Line& sline) {
-	std::string	clientNick =_clientList[clientFd].getNickname();
-	
-	if (clientNick.empty()) {
-		clientNick = "*";
+	Client* pCli = getClient(clientFd);
+	if (pCli == NULL) {
+		return (false);
 	}
+	std::string	clientNick = (pCli->getNickname().empty() ? "*" :  pCli->getNickname());
 	if (sline.params.empty()) {
 		_sendErrNeedMoreParams(clientFd, clientNick, sline.command);
 		return (false);
@@ -234,22 +244,21 @@ bool	Server::_handlePart(int clientFd, const s_Line& sline) {
 		}
 		if (chanName.empty())
 			continue;
-		std::map<std::string, Channel>::iterator	channelIt = _channelList.find(chanName);
-		std::map<int, Client>::iterator				client = _clientList.find(clientFd);
-		if (channelIt != _channelList.end()) {
-			if (channelIt->second.isMember(clientFd)) {
-				const std::map<int, Channel::MemberState>&	chanMembers = channelIt->second.getMembers();
+		Channel*	pChan = getChannel(chanName);
+		if (pChan != NULL) {
+			if (pChan->isMember(clientFd)) {
+				const std::map<int, Channel::MemberState>&	chanMembers = pChan->getMembers();
 				std::map<int, Channel::MemberState>::const_iterator membersIt = chanMembers.begin();
 				for (; membersIt != chanMembers.end(); ++membersIt) {
-					std::string prefix = ":" + clientNick + "!" + client->second.getUsername() + "@" + client->second.ipAddr;
+					std::string prefix = ":" + clientNick + "!" + pCli->getUsername() + "@" + pCli->ipAddr;
 					std::string line = prefix + " " + sline.command + " " + chanName + (reason.empty() ? "" : (" :" + reason)); 
 					_sendToClient(membersIt->first, line);
 				}
-				channelIt->second.removeMember(clientFd);
-				client->second.removeSubscribedChannel(chanName);
-				_printChannel(channelIt->second);
-				if (channelIt->second.empty()) {
-					_channelList.erase(channelIt);
+				pChan->removeMember(clientFd);
+				pCli->removeSubscribedChannel(chanName);
+				_printChannel(*pChan);
+				if (pChan->empty()) {
+					_channelList.erase(_channelList.find(chanName));
 					std::cout << "channel [" << chanName << "] have 0 member. Channel have been deleted successfully.\n";
 				}
 			}
@@ -266,22 +275,21 @@ bool	Server::_handlePart(int clientFd, const s_Line& sline) {
 
 // client send QUIT command to quit the server
 bool	Server::_handleQuit(int clientFd, const s_Line& sline) {
-	std::map<int, Client>::iterator itcli = _clientList.find(clientFd);
-	if (itcli == _clientList.end()) {
+	Client* 					pCli = getClient(clientFd);
+	if (pCli == NULL) {
 		return (false);
 	} 
 	typedef std::map<int, Channel::MemberState> ChannelMembersMap;
-	Client& 					client = itcli->second;
 	std::string					reason = (sline.params.empty() ? "" : sline.params[0]); 
 
 	// construct the notification message
-	std::string					nick = client.getNickname().empty() ? "*" : client.getNickname();
-	std::string					username = client.getUsername().empty() ? "*" : client.getUsername(); 
-	std::string					prefix = ":" + nick + "!" + username + "@" + client.ipAddr;
+	std::string					nick = pCli->getNickname().empty() ? "*" : pCli->getNickname();
+	std::string					username = pCli->getUsername().empty() ? "*" : pCli->getUsername(); 
+	std::string					prefix = ":" + nick + "!" + username + "@" + pCli->ipAddr;
 	std::string					line = prefix + " " + sline.command + " :Quit:" + (reason.empty() ? "" : " " + reason);
 
 
-	std::vector<std::string>	cliChannels = client.getSubscribedChannels();
+	std::vector<std::string>	cliChannels = pCli->getSubscribedChannels();
 	std::set<int>				listMembersToNotify;
 
 	// loop on the client's channel list
@@ -313,12 +321,16 @@ bool	Server::_handleQuit(int clientFd, const s_Line& sline) {
 	_sendToClient(clientFd, "ERROR :Closing Link: Quit:" + (reason.empty() ? "" : " " + reason));
 	
 	// clean the client from the server and close his socket
-	_cleanupClient(clientFd);
+	_cleanupClient(*pCli);
 	return (true);
 }
 
 bool	Server::_handlePing(int clientFd, const s_Line& sline) {
-	std::string clientNick = (_clientList[clientFd].getNickname().empty() ? "*" : _clientList[clientFd].getNickname());
+	Client*	pCli = getClient(clientFd);
+	if (pCli == NULL) {
+		return (false);
+	}
+	std::string clientNick = (pCli->getNickname().empty() ? "*" : pCli->getNickname());
 	
 	if (sline.params.empty()) {
 		_sendErrNeedMoreParams(clientFd, clientNick, sline.command);
@@ -330,13 +342,12 @@ bool	Server::_handlePing(int clientFd, const s_Line& sline) {
 }
 
 bool	Server::_handlePrivmsg(int clientFd, const s_Line& sline) {
-	std::map<int, Client>::iterator	clientIt = _clientList.find(clientFd);
-	if (clientIt == _clientList.end()) {
+	Client* pCli = getClient(clientFd);
+	if (pCli == NULL) {
 		return (false);
 	}
-	Client& cli = clientIt->second;
-	std::string clientNick = (cli.getNickname().empty() ? "*" : cli.getNickname());
-	std::string clientUsername = (cli.getUsername().empty() ? "*" : cli.getUsername());
+	std::string clientNick = (pCli->getNickname().empty() ? "*" : pCli->getNickname());
+	std::string clientUsername = (pCli->getUsername().empty() ? "*" : pCli->getUsername());
 	
 	if (sline.params.empty()) {
 		_sendErrNoRecipient(clientFd, clientNick, sline.command);
@@ -349,7 +360,7 @@ bool	Server::_handlePrivmsg(int clientFd, const s_Line& sline) {
 	bool		sendAtLeastOne = false;
 	std::string targetParam = sline.params[0];
 	std::string message = sline.params[1];
-	std::string prefix = ":" + clientNick + "!" + clientUsername + "@" + cli.ipAddr;
+	std::string prefix = ":" + clientNick + "!" + clientUsername + "@" + pCli->ipAddr;
 	
 	// to handle multi target ex: #chan1,#chan2... split on every comma ',' until the end
 	while (!targetParam.empty()) {
@@ -371,42 +382,75 @@ bool	Server::_handlePrivmsg(int clientFd, const s_Line& sline) {
 
 		std::string ret = prefix + " PRIVMSG " + targetName + " :" + message;
 		
+		// check if is target is a channel or a user
 		if (targetName[0] != '#') {
 			// check if client exist
-			std::map<int, Client>::iterator usertIt = getUserByNick(targetName);
-			if (usertIt == _clientList.end()) {
+			Client*	pUser = getUserByNick(targetName);
+			if (pUser == NULL) {
 				_sendErrNoSuchNick(clientFd, clientNick, targetName);
 				continue;
 			}
 			// send the message to targetName
-			_sendToClient(usertIt->second.fd, ret);
+			_sendToClient(pUser->fd, ret);
 			sendAtLeastOne = true;
 		}
 		else {
 			// check if channel exist
-			std::map<std::string, Channel>::iterator chanIt = _channelList.find(targetName);
-			if (chanIt == _channelList.end()) {
+			Channel* pChan = getChannel(targetName); 
+			if (pChan == NULL) {
 				_sendErrNoSuchChannel(clientFd, clientNick, targetName);
 				continue;
 			}
-			Channel& chan = chanIt->second; 
 			// check if client is member
-			if (!chan.isMember(clientFd)) {
+			if (!pChan->isMember(clientFd)) {
 				_sendErrCannotSendToChan(clientFd, clientNick, targetName);
 				continue;
 			}
 			// send the message
-			const std::map<int, Channel::MemberState>& members = chan.getMembers();
+			const std::map<int, Channel::MemberState>& members = pChan->getMembers();
 			std::map<int, Channel::MemberState>::const_iterator membersIt = members.begin();
 			for (; membersIt != members.end(); ++membersIt) {
 				if (membersIt->first == clientFd) {
 					continue;
 				}
 				_sendToClient(membersIt->first, ret);
-				sendAtLeastOne = true;
+				sendAtLeastOne = true;                
 			}
 		}
 	}
 	// if the targe is a user and the user is not connected send RPL_AWAY (301)
 	return (sendAtLeastOne);
+}
+
+//? Command: KICK 
+//? Parameters: <channel> <user> *( "," <user> ) [<comment>]
+//? KICK #Finnish Matthew ; Command to kick Matthew from #Finnish
+//? KICK #Finnish John :Speaking English; Command to kick John from #Finnish using "Speaking English" as the reason (comment).
+
+bool	Server::_handleKick(int clientFd, const s_Line& sline) {
+	(void)clientFd;
+	(void)sline;
+	// Client &cli = getClient(clientFd);
+
+	// // check params size
+	// //! ERR_NEEDMOREPARAMS (461)   "<client> <command> :Not enough parameters"
+	// if (sline.params.size() < 2) {
+	// 	_sendErrNeedMoreParams(clientFd, )
+	// }                           	                                                                    
+
+	// // check channel if exist
+	// //! ERR_NOSUCHCHANNEL (403) "<client> <channel> :No such channel"
+
+
+	// // check op privileges of the client
+	// //! ERR_NOTONCHANNEL (442)  "<client> <channel> :You're not on that channel"
+	// //! ERR_CHANOPRIVSNEEDED (482)  "<client> <channel> :You're not channel operator"
+
+
+	// // check user in channel 
+	// //! ERR_USERNOTINCHANNEL (441)   "<client> <nick> <channel> :They aren't on that channel"
+
+
+	// // 
+	return (true);
 }

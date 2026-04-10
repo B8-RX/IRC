@@ -80,7 +80,7 @@ void	Server::run(void) {
 			}
 		}
 	}
-	closeSockets();
+	_closeServer();
 }
 
 
@@ -107,7 +107,7 @@ void	Server::_handleNewClient(void) {
 	newPollfd.revents = 0;
 	client.fd = clientFd;
 	client.ipAddr = inet_ntoa(clientAdd.sin_addr);
-	_clientList[clientFd] = client;
+	_clientList.insert(std::make_pair(clientFd, client));
 	_pollfdList.push_back(newPollfd);
 
 	std::cout << "\nClient: [" << clientFd << "] connected!\n";
@@ -116,24 +116,22 @@ void	Server::_handleNewClient(void) {
 
 
 void	Server::_handleReceivedData(int clientFd) {
-	std::cout << "\n\nFunction HandleReceivedData: fd = " << clientFd << "\n";
+
+	Client*	pCli = getClient(clientFd);
+	if (pCli == NULL) {
+		return;
+	}
 	char	buffer[BUFFER_SIZE];
 	int		readBytes;
 
 	memset(buffer, 0, sizeof(buffer));
 	readBytes = recv(clientFd, buffer, sizeof(buffer), MSG_DONTWAIT);
+	
 	if (readBytes == 0) {
 		//?INFO: end of line reached or client disconnected. cleanup...
-		//TODO: cleanup: remove the client from the channels where he is a member
-		std::cout << "cleanup client [" << clientFd << "]\n";
-		close(_clientList[clientFd].fd);
-		_clientList.erase(clientFd);
-		for (size_t i = 0; i < _pollfdList.size(); ++i) {
-			if (_pollfdList[i].fd == clientFd) {
-				_pollfdList.erase(_pollfdList.begin() + i);
-				break;
-			}
-		}
+		//TODO send QUIT acknowledgement to other users whom share the same channel with this client
+		//TODO add log of the quit
+		_cleanupClient(*pCli);
 		return ;
 	}
 	else if (readBytes == -1) {
@@ -147,22 +145,27 @@ void	Server::_handleReceivedData(int clientFd) {
 			return ;
 		}
 	}
-	_clientList[clientFd].bufferIn.append(buffer, readBytes);
+	pCli->bufferIn.append(buffer, readBytes);
 	
 	struct s_Line				sLine;
 	std::vector<std::string>	vLines;
 	
-	vLines = _splitCRLF(clientFd); // extract complete lines
+	vLines = _splitCRLF(clientFd); // extract complete lines (lines ending with \r\n)
 	
-	// process received data
+	// handle received data
 	for (std::size_t i = 0; i < vLines.size(); ++i) {
 		sLine = _parseLine(vLines[i]);
-		_dispatchCommand(clientFd, sLine);
-		_printLine(sLine);
+		if (_dispatchCommand(clientFd, sLine) == true) {
+			_printLogSucces("INFO", sLine, *pCli);
+		}
+		else {
+			_printLogDebug("DEBUG", sLine.raw);
+		}
 	}
-	if (_clientList.find(clientFd) != _clientList.end()) {
-		_printClient(_clientList[clientFd]);
-	}
+	// if (_clientList.find(clientFd) != _clientList.end()) {
+	// 	_printClient(*pCli);
+	// }
+	// _printServerInfo();
 }
 
 bool	Server::_updateRegisteredState(int clientFd) {
@@ -171,9 +174,9 @@ bool	Server::_updateRegisteredState(int clientFd) {
 	return (cli->getRegirstered());
 }
 
-void	Server::_cleanupClient(int clientFd) {
+void	Server::_cleanupClient(const Client& cli) {
 
-	std::vector<std::string>	cliChannels = _clientList.find(clientFd)->second.getSubscribedChannels();
+	std::vector<std::string>	cliChannels = cli.getSubscribedChannels();
 	
 	// boucler sur la liste des channels dont le client est membre
 	for (std::size_t i = 0; i < cliChannels.size(); ++i) {
@@ -187,7 +190,7 @@ void	Server::_cleanupClient(int clientFd) {
 		Channel&			channel = chanIt->second;
 
 		// retirer le client de la liste des membres du channel
-		channel.removeMember(clientFd);
+		channel.removeMember(cli.fd);
 		
 		// supprimer le channel si vide
 		if (channel.empty()) {
@@ -197,39 +200,27 @@ void	Server::_cleanupClient(int clientFd) {
 	
 	// retirer la structure poll qui surveillait les events sur le socket du client
 	for (std::size_t i = 0; i < _pollfdList.size(); ++i) {
-		if (_pollfdList[i].fd == clientFd) {
+		if (_pollfdList[i].fd == cli.fd) {
 			_pollfdList.erase(_pollfdList.begin() + i);
 			break;
 		}
 	}
 	
 	// fermer le socket
-	if (clientFd != -1) {
-		std::cout << "cleanup client [" << clientFd << "]\n";
-		close(clientFd);
+	if (cli.fd != -1) {
+		std::cout << "close client socket [" << cli.fd << "]\n";
+		close(cli.fd);
 	}
-	
 	// retirer le client de la liste des clients du serveur
-	std::map<int, Client>::iterator cliIt = _clientList.find(clientFd);
-	if (cliIt != _clientList.end()) {
-		_clientList.erase(cliIt);
+	if (_clientList.find(cli.fd) != _clientList.end()) {
+		_clientList.erase(cli.fd);
 	}
-	
 }
 
-void	Server::closeSockets(void) {
-	std::map<int, Client>::iterator it = _clientList.begin();
-	for (; it != _clientList.end(); ++it) {
-		std::cout << "cleanup client [" << it->second.fd << "]\n";
-		if (it->second.fd != -1) {
-			close(it->second.fd);
-		}
+void	Server::_closeServer(void) {
+	while (!_clientList.empty()) {
+		_cleanupClient(_clientList.begin()->second);
 	}
-	// std::map<std::string, Channel>::iterator itc = _channelList.begin();
-	// for (; itc != _channelList.end(); ++itc) {
-	// 	std::cout << "cleanup channel [" << itc->first << "]\n";
-	// 	_channelList.erase(itc);
-	// }
 	if (_serverSocket != -1) {
 		std::cout << "cleanup Sever [" << _serverSocket << "]\n";
 		close(_serverSocket);
@@ -256,21 +247,31 @@ std::size_t	Server::channelCount(void) const {
 	return (_channelList.size());
 }
 
-std::map<int, Client>::iterator				Server::getClient(int clientFd) {
-	return (_clientList.find(clientFd));
+Client*			Server::getClient(int clientFd) {
+	std::map<int, Client>::iterator cliIt =  _clientList.find(clientFd);
+	if (cliIt == _clientList.end()) {
+		return (NULL);
+	}
+	return (&cliIt->second);
 }
 
-std::map<int, Client>::iterator				Server::getUserByNick(const std::string& nick) {
+Client*				Server::getUserByNick(const std::string& nick) {
 	std::map<int, Client>::iterator it = _clientList.begin();
 	for (; it != _clientList.end(); ++it) {
 		if (it->second.getNickname() == nick) {
-			return (it);
+			break;
 		}
 	}
-	return (_clientList.end());
+	if (it == _clientList.end()) {
+		return (NULL);
+	}
+	return (&it->second);
 }
 
-std::map<std::string, Channel>::iterator	Server::getChannelIt(const std::string& name) {
-	return (_channelList.find(name));
+Channel*	Server::getChannel(const std::string& name) {
+	std::map<std::string, Channel>::iterator it = _channelList.find(name);
+	if (it == _channelList.end()) {
+		return (NULL);
+	}
+	return (&it->second);
 }
-
