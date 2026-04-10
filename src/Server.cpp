@@ -63,7 +63,7 @@ void	Server::init(void) {
 	pollfd.events = POLLIN;
 	pollfd.revents = 0;
 	_pollfdList.push_back(pollfd);
-	std::cout << BLUE << "server initialized successfully.\n"
+	std::cout << MAGENTA << "server initialized successfully.\n"
 				<< "Port: " << _port << RESET "\n";
 }
 
@@ -250,7 +250,7 @@ Client*			Server::getClient(int clientFd) {
 	return (&cliIt->second);
 }
 
-Client*				Server::getUserByNick(const std::string& nick) {
+Client*				Server::getClientByNick(const std::string& nick) {
 	std::map<int, Client>::iterator it = _clientList.begin();
 	for (; it != _clientList.end(); ++it) {
 		if (it->second.getNickname() == nick) {

@@ -251,8 +251,11 @@ bool	Server::_handlePart(Client& cli, const s_Line& sline) {
 				std::map<int, Channel::MemberState>::const_iterator membersIt = chanMembers.begin();
 				for (; membersIt != chanMembers.end(); ++membersIt) {
 					std::string prefix = ":" + clientNick + "!" + cli.getUsername() + "@" + cli.ipAddr;
-					std::string message = prefix + " " + sline.command + " " + chanName + (reason.empty() ? "" : (" :" + reason)); 
-					_sendToClient(membersIt->first, message);
+					std::string message = CYAN + prefix + " " + sline.command + " " + chanName;
+					if (!reason.empty()) {
+						message += " :"  + std::string(RESET) + reason;
+					}
+					_sendToClient(membersIt->first, message + std::string(RESET));
 				}
 				pChan->removeMember(cli.fd);
 				cli.removeSubscribedChannel(chanName);
@@ -284,7 +287,7 @@ bool	Server::_handleQuit(Client& cli, const s_Line& sline) {
 	std::string					nick = cli.getNickname().empty() ? "*" : cli.getNickname();
 	std::string					username = cli.getUsername().empty() ? "*" : cli.getUsername(); 
 	std::string					prefix = ":" + nick + "!" + username + "@" + cli.ipAddr;
-	std::string					line = prefix + " " + sline.command + " :Quit:" + (reason.empty() ? "" : " " + reason);
+	std::string					message = prefix + " " + sline.command + " :Quit:" + (reason.empty() ? "" : " " + reason);
 
 
 	std::vector<std::string>	cliChannels = cli.getSubscribedChannels();
@@ -313,10 +316,14 @@ bool	Server::_handleQuit(Client& cli, const s_Line& sline) {
 	}
 	// send QUIT notification to the members on the list of the members to notify
 	for (std::set<int>::iterator it = listMembersToNotify.begin(); it != listMembersToNotify.end(); ++it) {
-		_sendToClient(*it, line);
+		_sendToClient(*it, CYAN + message + RESET);
 	}
 	// send a QUIT acknowledgement to the client
-	_sendToClient(cli.fd, "ERROR :Closing Link: Quit:" + (reason.empty() ? "" : " " + reason));
+	message = std::string(CYAN) + "ERROR :Closing Link: Quit:";
+	if (!reason.empty()) {
+		message += " "  + std::string(RESET) + reason;
+	}
+	_sendToClient(cli.fd, message + std::string(RESET));
 	_printLogServer("INFO", cli, sline, sline.command);
 	
 	// clean the client from the server and close his socket
@@ -332,8 +339,8 @@ bool	Server::_handlePing(Client& cli, const s_Line& sline) {
 		_sendErrNeedMoreParams(cli, clientNick, sline, sline.command);
 		return (false);
 	}
-	std::string message = ":" + _serverName + " PONG " + _serverName + " " + sline.params[0];
-	_sendToClient(cli.fd, message);
+	std::string message =  std::string(CYAN) + ":" + _serverName + " PONG " + _serverName + " " + sline.params[0] + RESET;
+	_sendToClient(cli.fd, message + std::string(RESET));
 	_printLogServer("INFO", cli, sline, sline.command);
 	return (true);
 }
@@ -353,7 +360,7 @@ bool	Server::_handlePrivmsg(Client& cli, const s_Line& sline) {
 	}
 	bool		sendAtLeastOne = false;
 	std::string targetParam = sline.params[0];
-	std::string message = sline.params[1];
+	std::string privMsg = sline.params[1];
 	std::string prefix = ":" + clientNick + "!" + clientUsername + "@" + cli.ipAddr;
 	
 	// to handle multi target ex: #chan1,#chan2... split on every comma ',' until the end
@@ -374,18 +381,18 @@ bool	Server::_handlePrivmsg(Client& cli, const s_Line& sline) {
 		
 		// construct the full message
 
-		std::string ret = prefix + " PRIVMSG " + targetName + " :" + message;
+		std::string message = CYAN + prefix + " PRIVMSG " + targetName + " :" + RESET + privMsg;
 		
 		// check if is target is a channel or a user
 		if (targetName[0] != '#') {
 			// check if client exist
-			Client*	pUser = getUserByNick(targetName);
+			Client*	pUser = getClientByNick(targetName);
 			if (pUser == NULL) {
 				_sendErrNoSuchNick(cli, clientNick, sline, targetName);
 				continue;
 			}
 			// send the message to targetName
-			_sendToClient(pUser->fd, ret);
+			_sendToClient(pUser->fd, message + std::string(RESET));
 			_printLogServer("INFO", cli, sline, targetName);
 
 			sendAtLeastOne = true;
@@ -409,7 +416,7 @@ bool	Server::_handlePrivmsg(Client& cli, const s_Line& sline) {
 				if (membersIt->first == cli.fd) {
 					continue;
 				}
-				_sendToClient(membersIt->first, ret);
+				_sendToClient(membersIt->first, message + std::string(RESET));
 				_printLogServer("INFO", cli, sline, targetName);
 				sendAtLeastOne = true;                
 			}
@@ -421,31 +428,79 @@ bool	Server::_handlePrivmsg(Client& cli, const s_Line& sline) {
 
 //? Command: KICK 
 //? Parameters: <channel> <user> *( "," <user> ) [<comment>]
-//? KICK #Finnish Matthew ; Command to kick Matthew from #Finnish
-//? KICK #Finnish John :Speaking English; Command to kick John from #Finnish using "Speaking English" as the reason (comment).
+//? ===> KICK #Finnish Matthew ; Command to kick Matthew from #Finnish
+//? ===> KICK #Finnish John :Speaking English; Command to kick John from #Finnish using "Speaking English" as the reason (comment).
+//? message <=== :WiZ!jto@tolsun.oulu.fi KICK #Finnish John; KICK message on channel #Finnish from WiZ to remove John from channel
 
-// bool	Server::_handleKick(Client& cli, const s_Line& sline) {
+bool	Server::_handleKick(Client& cli, const s_Line& sline) {
 
-// 	// check params size
-// 	//! ERR_NEEDMOREPARAMS (461)   "<client> <command> :Not enough parameters"
-// 	if (sline.params.size() < 2) {
-// 		_sendErrNeedMoreParams(cli, cli.getNickname(), sline, sline.command);
-// 		return (false);
-// 	}                           	                                                                    
+	// check params size
+	//! ERR_NEEDMOREPARAMS (461)   "<client> <command> :Not enough parameters"
+	if (sline.params.size() < 2) {
+		_sendErrNeedMoreParams(cli, cli.getNickname(), sline, sline.command);
+		return (false);
+	}                           	                                                                    
 
-// 	// check channel if exist
-// 	//! ERR_NOSUCHCHANNEL (403) "<client> <channel> :No such channel"
+	std::string chanName = sline.params[0];
+	// check channel if exist
+	//! ERR_NOSUCHCHANNEL (403) "<client> <channel> :No such channel"
+	Channel* pChan = getChannel(chanName);
+	if (pChan == NULL) {
+		_sendErrNoSuchChannel(cli, cli.getNickname(), sline, chanName);
+		return (false);
+	}
+	// check op privileges of the client
+	//! ERR_NOTONCHANNEL (442)  "<client> <channel> :You're not on that channel"
+	//! ERR_CHANOPRIVSNEEDED (482)  "<client> <channel> :You're not channel operator"
+	if (pChan->isMember(cli.fd) == false) {
+		_sendErrNotOnChannel(cli, cli.getNickname(), sline, chanName);
+		return (false);
+	}
+	if (pChan->isChanOp(cli.fd) == false) {
+		_sendErrChaNoPrivsNeeded(cli, cli.getNickname(), sline, chanName);
+		return (false);
+	}
+	std::string	userParam = sline.params[1];
+	std::string userName;
+	std::string reason = (sline.params.size() >= 3 ? sline.params[2] : "");
+	std::string prefix = ":" + cli.getNickname() + "!" + cli.getUsername() + "@" + cli.ipAddr;
 
+	while (!userParam.empty()) {
+		std::size_t commaPos = userParam.find(',');
+		if (commaPos == std::string::npos) {
+			userName = userParam;
+			userParam.clear();
+		}
+		else {
+			userName = userParam.substr(0, commaPos);
+			userParam.erase(0, commaPos + 1);
+		}
+		if (userName.empty()) {
+			continue;
+		}
+		// check user in channel 
+		//! ERR_USERNOTINCHANNEL (441)   "<client> <nick> <channel> :They aren't on that channel"
+		Client* user = getClientByNick(userName);
+		if (user == NULL) {
+			continue;
+		}
+		if (pChan->isMember(user->fd) == false) {
+			_sendErrNotOnChannel(cli, user->getNickname(), sline, chanName);
+			continue;
+		}
+		const std::map<int, Channel::MemberState>& membList = pChan->getMembers();
+		std::map<int, Channel::MemberState>::const_iterator membIt = membList.begin();
+		std::string message = CYAN + prefix + " " + sline.command + " " + chanName + " " + user->getNickname();
+		if (!reason.empty()) {
+			message += " reason:" + std::string(RED) + "(" + reason + ")";
+		}
+		for (; membIt != membList.end(); ++membIt) {
+			_sendToClient(membIt->first, message + std::string(RESET));
+		}
+		pChan->removeMember(user->fd);
+		user->removeSubscribedChannel(pChan->getName());
+		_printLogServer("INFO", cli, sline, user->getNickname());
+	}
+	return (true);
+}
 
-// 	// check op privileges of the client
-// 	//! ERR_NOTONCHANNEL (442)  "<client> <channel> :You're not on that channel"
-// 	//! ERR_CHANOPRIVSNEEDED (482)  "<client> <channel> :You're not channel operator"
-
-
-// 	// check user in channel 
-// 	//! ERR_USERNOTINCHANNEL (441)   "<client> <nick> <channel> :They aren't on that channel"
-
-
-// 	// 
-// 	return (true);
-// }

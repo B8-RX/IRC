@@ -17,6 +17,8 @@
 #define GREEN "\033[32m"
 #define YELLOW "\033[33m"
 #define BLUE "\033[34m"
+#define MAGENTA "\033[35m"
+#define CYAN "\033[36m"
 #define RESET "\033[0m"
 
 #define BUFFER_SIZE 1024
@@ -31,7 +33,7 @@ class Server {
 		std::size_t									clientCount(void) const;
 		std::size_t									channelCount(void) const;
 		Client*										getClient(int clienFd);
-		Client*										getUserByNick(const std::string& nick);
+		Client*										getClientByNick(const std::string& nick);
 		Channel*									getChannel(const std::string& name);
 		struct s_Line {
 			std::string					raw;
@@ -77,7 +79,7 @@ class Server {
 		void							_sendErrNoTextToSend(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
 		void							_sendErrNoSuchNick(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
 		void							_sendErrCannotSendToChan(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
-		
+		void							_sendErrChaNoPrivsNeeded(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
 
 		// helper framing/parsing	
 		std::vector<std::string>		_splitCRLF(int clientFd);
