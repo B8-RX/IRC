@@ -59,7 +59,7 @@ bool    Client::setRegirstered(bool state) {
     return (_registered);
 }
 
-bool    Client::addMemberChan(const std::string& name) {
+bool    Client::addSubscriptionChan(const std::string& name) {
     _channels.push_back(name); 
     return (true);
 }

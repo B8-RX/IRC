@@ -63,8 +63,8 @@ void	Server::init(void) {
 	pollfd.events = POLLIN;
 	pollfd.revents = 0;
 	_pollfdList.push_back(pollfd);
-	std::cout << "server initialized successfully.\n"
-				<< "Port: " << _port << "\n";
+	std::cout << BLUE << "server initialized successfully.\n"
+				<< "Port: " << _port << RESET "\n";
 }
 
 void	Server::run(void) {
@@ -95,11 +95,11 @@ void	Server::_handleNewClient(void) {
 	clientAddLen = sizeof(clientAdd);
 	clientFd = accept(_serverSocket, (struct sockaddr*)&clientAdd, &clientAddLen);
 	if (clientFd == -1) {
-		std::cerr << "accept: Failed to create and connect client socket: " + std::string(strerror(errno));
+		std::cerr << RED << "accept: Failed to create and connect client socket: " + std::string(strerror(errno)) << RESET;
 		return ;
 	}
 	if (fcntl(clientFd, F_SETFL, O_NONBLOCK) == -1) {
-		std::cerr << "fcntl: Failed to add optin O_NONBLOCK to client socket: " + std::string(strerror(errno));
+		std::cerr << RED << "fcntl: Failed to add optin O_NONBLOCK to client socket: " + std::string(strerror(errno)) << RESET;
 		return ;
 	}
 	newPollfd.fd = clientFd;
@@ -110,8 +110,8 @@ void	Server::_handleNewClient(void) {
 	_clientList.insert(std::make_pair(clientFd, client));
 	_pollfdList.push_back(newPollfd);
 
-	std::cout << "\nClient: [" << clientFd << "] connected!\n";
-	std::cout << "address: [" << client.ipAddr << "]\n";
+	std::cout << YELLOW "\nnew connection established on fd " << "[" << clientFd << "]\n";
+	std::cout << "address: [" << client.ipAddr << "]\n" << RESET;
 }
 
 
@@ -141,7 +141,7 @@ void	Server::_handleReceivedData(int clientFd) {
 		}
 		else
 		{
-			std::cerr << "recv: " + std::string(strerror(errno));
+			std::cerr << RED << "recv: " + std::string(strerror(errno)) << RESET;
 			return ;
 		}
 	}
@@ -155,12 +155,7 @@ void	Server::_handleReceivedData(int clientFd) {
 	// handle received data
 	for (std::size_t i = 0; i < vLines.size(); ++i) {
 		sLine = _parseLine(vLines[i]);
-		if (_dispatchCommand(clientFd, sLine) == true) {
-			_printLogSucces("INFO", sLine, *pCli);
-		}
-		else {
-			_printLogDebug("DEBUG", sLine.raw);
-		}
+		_dispatchCommand(clientFd, sLine);
 	}
 	// if (_clientList.find(clientFd) != _clientList.end()) {
 	// 	_printClient(*pCli);

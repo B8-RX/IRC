@@ -35,7 +35,7 @@ class Client {
 	bool							setPassAccepted(bool state);
 	bool							setRegirstered(bool state);
 
-	bool							addMemberChan(const std::string& name);
+	bool							addSubscriptionChan(const std::string& name);
 	bool							isMemberChan(const std::string& name) const;
 	const std::vector<std::string>&	getSubscribedChannels(void) const;
 	bool							removeSubscribedChannel(const std::string& channel);

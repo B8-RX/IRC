@@ -16,6 +16,7 @@
 #define RED "\033[31m"
 #define GREEN "\033[32m"
 #define YELLOW "\033[33m"
+#define BLUE "\033[34m"
 #define RESET "\033[0m"
 
 #define BUFFER_SIZE 1024
@@ -61,55 +62,56 @@ class Server {
 
 		// messaging
 		void							_sendToClient(int clientFd, const std::string& message) const;
-		void							_sendErrUnregistered(int clienFd, const std::string& nick) const;
-		void							_sendErrUnknownCommand(int clientFd, const std::string& nick, const std::string& cmd) const;
-		void							_sendErrNeedMoreParams(int clientFd, const std::string& nick, const std::string& cmd) const;
-		void							_sendErrAlreadyRegistered(int clientFd, const std::string& nick) const;
-		void							_sendErrPassMisMatch(int clienFd, const std::string& nick) const;
-		void							_sendErrNoNickNameGiven(int clienFd, const std::string& nick) const;
-		void							_sendErrOnUseNickName(int clienFd, const std::string& nick, const std::string& target) const;
-		void							_sendErrNickNameInUse(int clienFd, const std::string& nick, const std::string& target) const;
-		void							_sendErrBadChanMask(int clientFd, const std::string& nick, const std::string& channel) const;
-		void							_sendErrNoSuchChannel(int clientFd, const std::string& nick, const std::string& channel) const;
-		void							_sendErrNotOnChannel(int clientFd, const std::string& nick, const std::string& channel) const;
-		void							_sendErrNoRecipient(int clientFd, const std::string& nick, const std::string& cmd) const;
-		void							_sendErrNoTextToSend(int clientFd, const std::string& nick) const;
-		void							_sendErrNoSuchNick(int clientFd, const std::string& nick, const std::string& target) const;
-		void							_sendErrCannotSendToChan(int clientFd, const std::string& nick, const std::string& channel) const;
+		void							_sendErrNeedMoreParams(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
+		void							_sendErrAlreadyRegistered(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
+		void							_sendErrNoNickNameGiven(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
+		void							_sendErrOnUseNickName(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
+		void							_sendErrNickNameInUse(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
+		void							_sendErrBadChanMask(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
+		void							_sendErrUnknownCommand(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
+		void							_sendErrUnregistered(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
+		void							_sendErrPassMisMatch(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
+		void							_sendErrNotOnChannel(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
+		void							_sendErrNoSuchChannel(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
+		void							_sendErrNoRecipient(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
+		void							_sendErrNoTextToSend(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
+		void							_sendErrNoSuchNick(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
+		void							_sendErrCannotSendToChan(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
+		
 
 		// helper framing/parsing	
 		std::vector<std::string>		_splitCRLF(int clientFd);
-		std::string						_spaceTrim(const std::string& line) const;
+		std::string						_spaceTrim(const std::string& sline) const;
 
 		// parsing	
-		struct s_Line					_parseLine(const std::string& line);
-		std::string						_handlePrefix(std::string& line);
-		std::string						_handleCommand(std::string& line);
-		std::vector<std::string>		_handleParams(std::string& line);
+		struct s_Line					_parseLine(const std::string& sline);
+		std::string						_handlePrefix(std::string& sline);
+		std::string						_handleCommand(std::string& sline);
+		std::vector<std::string>		_handleParams(std::string& sline);
 
 		// validation/execution	
 		bool							_dispatchCommand(int clientFd, const s_Line& sLine);
 
-		bool							_handlePass(int clientFd, const s_Line& line);
-		bool							_handleNick(int clientFd, const s_Line& line);
-		bool							_handleUser(int clientFd, const s_Line& line);
-		bool							_handleJoin(int clientFd, const s_Line& line);
-		bool							_handlePart(int clientFd, const s_Line& line);
-		bool							_handleQuit(int clientFd, const s_Line& line);
-		bool							_handlePing(int clientFd, const s_Line& line);
-		bool							_handlePrivmsg(int clientFd, const s_Line& line);
-		bool							_handleKick(int clientFd, const s_Line& line);
+		bool							_handlePass(Client& cli, const s_Line& sline);
+		bool							_handleNick(Client& cli, const s_Line& sline);
+		bool							_handleUser(Client& cli, const s_Line& sline);
+		bool							_handleJoin(Client& cli, const s_Line& sline);
+		bool							_handlePart(Client& cli, const s_Line& sline);
+		bool							_handleQuit(Client& cli, const s_Line& sline);
+		bool							_handlePing(Client& cli, const s_Line& sline);
+		bool							_handlePrivmsg(Client& cli, const s_Line& sline);
+		bool							_handleKick(Client& cli, const s_Line& sline);
 
 		// state update	
 		bool							_updateRegisteredState(int clientFd);
 		
 		// utils 	
-		void							_printLogSucces(const std::string& type, const s_Line& sline, const Client& cli);
-		void							_printLogDebug(const std::string& type, const std::string& message) const;
+		std::string					_generateLogInfo(const s_Line& sline, const Client& cli, const std::string& info) const;
+		void							_printLogServer(const std::string& type, const Client& cli, const s_Line& sline, const std::string& info) const;
+		void							_printServerInfo(void) const;
 		void    						_printLine(const Server::s_Line& sLine) const;
 		void    						_printClient(const Client& client) const;
 		void							_printChannel(Channel& channel) const;
-		void							_printServerInfo(void) const;
 		bool    						_isValidNick(const std::string& nick) const;
 		bool							_isUsedNick(std::map<int, Client>& ClientsList, const std::string& nick, int clientFd) const;
 
