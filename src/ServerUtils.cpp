@@ -175,119 +175,119 @@ void	Server::_sendToClient(int clientFd, const std::string& message) const {
 
 void	Server::_sendErrNeedMoreParams(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const {
 	std::string	numeric = " 461 ";
-	std::string line = ":" + _serverName + numeric + nick + " " + target + " :Not enough parameters"; 
+	std::string line = std::string(RED) + ":" + _serverName + numeric + nick + " " + target + " :Not enough parameters" + std::string(RESET); 
 	_printLogServer("DEBUG", cli, sline, line);
-	_sendToClient(cli.fd, RED + line + RESET);
+	_sendToClient(cli.fd, line);
 }
 
 void	Server::_sendErrAlreadyRegistered(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const {
 	(void)target;
 	std::string	numeric = " 462 ";
-	std::string line = ":" + _serverName + numeric + nick + " :You may not reregister"; 
+	std::string line = std::string(RED) + ":" + _serverName + numeric + nick + " :You may not reregister" + std::string(RESET); 
 	_printLogServer("DEBUG", cli, sline, line);
-	_sendToClient(cli.fd, RED + line + RESET);
+	_sendToClient(cli.fd, line);
 }	
 
 void	Server::_sendErrNoNickNameGiven(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const {
 	(void)target;
 	std::string	numeric = " 431 ";
-	std::string line = ":" + _serverName + numeric + nick + " :No nickname given"; 
+	std::string line = std::string(RED) + ":" + _serverName + numeric + nick + " :No nickname given" + std::string(RESET); 
 	_printLogServer("DEBUG", cli, sline, line);
-	_sendToClient(cli.fd, RED + line + RESET);
+	_sendToClient(cli.fd, line);
 }
 
 void	Server::_sendErrOnUseNickName(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target)  const {
 	std::string	numeric = " 432 ";
-	std::string line = ":" + _serverName + numeric + nick + " " + target + " :Erroneus nickname"; 
+	std::string line = std::string(RED) + ":" + _serverName + numeric + nick + " " + target + " :Erroneus nickname" + std::string(RESET); 
 	_printLogServer("DEBUG", cli, sline, line);
-	_sendToClient(cli.fd, RED + line + RESET);
+	_sendToClient(cli.fd, line);
 }
 
 void	Server::_sendErrNickNameInUse(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target)  const {
 	std::string	numeric = " 433 ";
-	std::string line = ":" + _serverName + numeric + nick + " " + target + " :Nickname is already in use"; 
+	std::string line = std::string(RED) + ":" + _serverName + numeric + nick + " " + target + " :Nickname is already in use" + std::string(RESET); 
 	_printLogServer("DEBUG", cli, sline, line);
-	_sendToClient(cli.fd, RED + line + RESET);
+	_sendToClient(cli.fd, line);
 }
 
 void	Server::_sendErrBadChanMask(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const {
 	std::string	numeric = " 476 ";
-	std::string line = ":" + _serverName + numeric + nick + " " + target + " :Bad Channel Mask"; 
+	std::string line = std::string(RED) + ":" + _serverName + numeric + nick + " " + target + " :Bad Channel Mask" + std::string(RESET); 
 	_printLogServer("DEBUG", cli, sline, line);
-	_sendToClient(cli.fd, RED + line + RESET);
+	_sendToClient(cli.fd, line);
 }
 
 void	Server::_sendErrUnknownCommand(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const {
 	(void)target;
 	std::string	numeric = " 421 ";
-	std::string line = ":" + _serverName + numeric + nick + " " + target + " :Unknown command";
+	std::string line = std::string(RED) + ":" + _serverName + numeric + nick + " " + target + " :Unknown command" + std::string(RESET);
 	_printLogServer("DEBUG", cli, sline, line);
-	_sendToClient(cli.fd, RED + line + RESET);
+	_sendToClient(cli.fd, line);
 }
 
 
 void	Server::_sendErrUnregistered(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const {
 	(void)target;
 	std::string	numeric = " 451 ";
-	std::string line = ":" + _serverName + numeric + nick + " :You have not registered"; 
+	std::string line = std::string(RED) + ":" + _serverName + numeric + nick + " :You have not registered" + std::string(RESET); 
 	_printLogServer("DEBUG", cli, sline, line);
-	_sendToClient(cli.fd, RED + line + RESET);
+	_sendToClient(cli.fd, line);
 }
 
 void	Server::_sendErrPassMisMatch(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const {
 	(void)target;
 	std::string	numeric = " 464 ";
-	std::string line = ":" + _serverName + numeric + nick + " :Password incorrect"; 
+	std::string line = std::string(RED) + ":" + _serverName + numeric + nick + " :Password incorrect" + std::string(RESET); 
 	_printLogServer("DEBUG", cli, sline, line);
-	_sendToClient(cli.fd, RED + line + RESET);
+	_sendToClient(cli.fd, line);
 }
 
 void	Server::_sendErrNotOnChannel(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const {
 	std::string	numeric = " 442 ";
-	std::string line = ":" + _serverName + numeric + nick + " " + target + " :You're not on that channel"; 
+	std::string line = std::string(RED) + ":" + _serverName + numeric + nick + " " + target + " :You're not on that channel" + std::string(RESET); 
 	_printLogServer("DEBUG", cli, sline, line);
-	_sendToClient(cli.fd, RED + line + RESET);
+	_sendToClient(cli.fd, line);
 }
 
 void	Server::_sendErrNoSuchChannel(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const {
 	std::string	numeric = " 403 ";
-	std::string line = ":" + _serverName + numeric + nick + " " + target + " :No such channel"; 
+	std::string line = std::string(RED) + ":" + _serverName + numeric + nick + " " + target + " :No such channel" + std::string(RESET); 
 	_printLogServer("DEBUG", cli, sline, line);
-	_sendToClient(cli.fd, RED + line + RESET);
+	_sendToClient(cli.fd, line);
 }
 
 void	Server::_sendErrNoRecipient(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const {
 	std::string	numeric = " 411 ";
-	std::string line = ":" + _serverName + numeric + nick + " :No recipient given (" + target + ")"; 
+	std::string line = std::string(RED) + ":" + _serverName + numeric + nick + " :No recipient given (" + target + ")" + std::string(RESET); 
 	_printLogServer("DEBUG", cli, sline, line);
-	_sendToClient(cli.fd, RED + line + RESET);
+	_sendToClient(cli.fd, line);
 }
 
 void	Server::_sendErrNoTextToSend(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const {
 	(void)target;
 	std::string	numeric = " 412 ";
-	std::string line = ":" + _serverName + numeric + nick + " :No text to send"; 
+	std::string line = std::string(RED) + ":" + _serverName + numeric + nick + " :No text to send" + std::string(RESET); 
 	_printLogServer("DEBUG", cli, sline, line);
-	_sendToClient(cli.fd, RED + line + RESET);
+	_sendToClient(cli.fd, line);
 }
 
 void	Server::_sendErrNoSuchNick(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const {
 	std::string	numeric = " 401 ";
-	std::string line = ":" + _serverName + numeric + nick + " " + target + " :No such nick/channel"; 
+	std::string line = std::string(RED) + ":" + _serverName + numeric + nick + " " + target + " :No such nick/channel" + std::string(RESET); 
 	_printLogServer("DEBUG", cli, sline, line);
-	_sendToClient(cli.fd, RED + line + RESET);
+	_sendToClient(cli.fd, line);
 }
 
 void	Server::_sendErrCannotSendToChan(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const {
 	std::string	numeric = " 404 ";
-	std::string line = ":" + _serverName + numeric + nick + " " + target + " :Cannot send to channel"; 
+	std::string line = std::string(RED) + ":" + _serverName + numeric + nick + " " + target + " :Cannot send to channel" + std::string(RESET); 
 	_printLogServer("DEBUG", cli, sline, line);
-	_sendToClient(cli.fd, RED + line + RESET);
+	_sendToClient(cli.fd, line);
 }
 
 void	Server::_sendErrChaNoPrivsNeeded(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const {
 	std::string	numeric = " 404 ";
-	std::string line = ":" + _serverName + numeric + nick + " " + target + " :You're not channel operator"; 
+	std::string line = std::string(RED) + ":" + _serverName + numeric + nick + " " + target + " :You're not channel operator" + std::string(RESET); 
 	_printLogServer("DEBUG", cli, sline, line);
-	_sendToClient(cli.fd, RED + line + RESET);
+	_sendToClient(cli.fd, line);
 }

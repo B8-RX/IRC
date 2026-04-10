@@ -251,11 +251,11 @@ bool	Server::_handlePart(Client& cli, const s_Line& sline) {
 				std::map<int, Channel::MemberState>::const_iterator membersIt = chanMembers.begin();
 				for (; membersIt != chanMembers.end(); ++membersIt) {
 					std::string prefix = ":" + clientNick + "!" + cli.getUsername() + "@" + cli.ipAddr;
-					std::string message = CYAN + prefix + " " + sline.command + " " + chanName;
+					std::string message = CYAN + prefix + " " + sline.command + " " + chanName + std::string(RESET);
 					if (!reason.empty()) {
 						message += " :"  + std::string(RESET) + reason;
 					}
-					_sendToClient(membersIt->first, message + std::string(RESET));
+					_sendToClient(membersIt->first, message);
 				}
 				pChan->removeMember(cli.fd);
 				cli.removeSubscribedChannel(chanName);
@@ -287,7 +287,7 @@ bool	Server::_handleQuit(Client& cli, const s_Line& sline) {
 	std::string					nick = cli.getNickname().empty() ? "*" : cli.getNickname();
 	std::string					username = cli.getUsername().empty() ? "*" : cli.getUsername(); 
 	std::string					prefix = ":" + nick + "!" + username + "@" + cli.ipAddr;
-	std::string					message = prefix + " " + sline.command + " :Quit:" + (reason.empty() ? "" : " " + reason);
+	std::string					message = CYAN +  prefix + " " + sline.command + " :Quit:" + (reason.empty() ? "" : " " + reason) + RESET;
 
 
 	std::vector<std::string>	cliChannels = cli.getSubscribedChannels();
@@ -316,14 +316,14 @@ bool	Server::_handleQuit(Client& cli, const s_Line& sline) {
 	}
 	// send QUIT notification to the members on the list of the members to notify
 	for (std::set<int>::iterator it = listMembersToNotify.begin(); it != listMembersToNotify.end(); ++it) {
-		_sendToClient(*it, CYAN + message + RESET);
+		_sendToClient(*it, message);
 	}
 	// send a QUIT acknowledgement to the client
-	message = std::string(CYAN) + "ERROR :Closing Link: Quit:";
+	message = std::string(CYAN) + "ERROR :Closing Link: Quit:" + std::string(RESET);
 	if (!reason.empty()) {
 		message += " "  + std::string(RESET) + reason;
 	}
-	_sendToClient(cli.fd, message + std::string(RESET));
+	_sendToClient(cli.fd, message);
 	_printLogServer("INFO", cli, sline, sline.command);
 	
 	// clean the client from the server and close his socket
@@ -339,8 +339,8 @@ bool	Server::_handlePing(Client& cli, const s_Line& sline) {
 		_sendErrNeedMoreParams(cli, clientNick, sline, sline.command);
 		return (false);
 	}
-	std::string message =  std::string(CYAN) + ":" + _serverName + " PONG " + _serverName + " " + sline.params[0] + RESET;
-	_sendToClient(cli.fd, message + std::string(RESET));
+	std::string message =  std::string(CYAN) + ":" + _serverName + " PONG " + _serverName + " " + sline.params[0] + std::string(RESET);
+	_sendToClient(cli.fd, message);
 	_printLogServer("INFO", cli, sline, sline.command);
 	return (true);
 }
@@ -381,7 +381,7 @@ bool	Server::_handlePrivmsg(Client& cli, const s_Line& sline) {
 		
 		// construct the full message
 
-		std::string message = CYAN + prefix + " PRIVMSG " + targetName + " :" + RESET + privMsg;
+		std::string message = CYAN + prefix + " PRIVMSG " + targetName + " :" + RESET + privMsg + std::string(RESET);
 		
 		// check if is target is a channel or a user
 		if (targetName[0] != '#') {
@@ -392,7 +392,7 @@ bool	Server::_handlePrivmsg(Client& cli, const s_Line& sline) {
 				continue;
 			}
 			// send the message to targetName
-			_sendToClient(pUser->fd, message + std::string(RESET));
+			_sendToClient(pUser->fd, message);
 			_printLogServer("INFO", cli, sline, targetName);
 
 			sendAtLeastOne = true;
@@ -416,7 +416,7 @@ bool	Server::_handlePrivmsg(Client& cli, const s_Line& sline) {
 				if (membersIt->first == cli.fd) {
 					continue;
 				}
-				_sendToClient(membersIt->first, message + std::string(RESET));
+				_sendToClient(membersIt->first, message);
 				_printLogServer("INFO", cli, sline, targetName);
 				sendAtLeastOne = true;                
 			}
@@ -492,14 +492,18 @@ bool	Server::_handleKick(Client& cli, const s_Line& sline) {
 		std::map<int, Channel::MemberState>::const_iterator membIt = membList.begin();
 		std::string message = CYAN + prefix + " " + sline.command + " " + chanName + " " + user->getNickname();
 		if (!reason.empty()) {
-			message += " reason:" + std::string(RED) + "(" + reason + ")";
+			message += " reason:" + std::string(RED) + "(" + reason + ")" + std::string(RESET);
 		}
 		for (; membIt != membList.end(); ++membIt) {
-			_sendToClient(membIt->first, message + std::string(RESET));
+			_sendToClient(membIt->first, message);
 		}
 		pChan->removeMember(user->fd);
 		user->removeSubscribedChannel(pChan->getName());
 		_printLogServer("INFO", cli, sline, user->getNickname());
+		if (pChan->empty()) {
+			_channelList.erase(pChan->getName());
+			break;
+		}
 	}
 	return (true);
 }
