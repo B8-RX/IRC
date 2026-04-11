@@ -4,6 +4,7 @@
 
 #include <string>
 #include <map>
+#include <set>
 #include <cstddef>
 
  class Channel {
@@ -17,21 +18,28 @@
             MemberState(bool isOp) : isChanOp(isOp) {}
         };
 
-        const std::string&                                  getName(void) const;
-        bool                                                empty(void) const;
-        std::size_t                                         memberCount(void) const;
+        const std::string&  getName(void) const;
+        bool                empty(void) const;
+        std::size_t         memberCount(void) const;
 
-        bool                                                addMember(int memberFd, bool isChanOp);
-        bool                                                removeMember(int memberFd);
+        bool                addMember(int memberFd, bool isOp);
+        bool                removeMember(int memberFd);
+        
+        bool                addInvite(int memberFd);
+        bool                removeInvite(int memberFd);
+        bool                isInvited(int memberFd);
+        
+        bool                isMode(const std::string& mode) const;
 
-        bool                                                isMember(int memberFd) const;
-        bool                                                isChanOp(int memberFd) const;
+        bool                isMember(int memberFd) const;
+        bool                isChanOp(int memberFd) const;
         std::map<int, MemberState>&                         getMembers(void);
-        // void                                                notifyQuit(int memberfd, const std::string& msg) const;
 
     private:
-        std::string                   _name;
-        std::map<int, MemberState>    _members;
+        std::string                 _name;
+        std::map<int, MemberState>  _members;
+        std::set<int>               _inviteList;
+        std::set<std::string>       _chanModeList; // i, t, k, o, l
  };
 
 #endif // !CHANNEL_HPP

@@ -64,23 +64,31 @@ class Server {
 
 		// messaging
 		void							_sendToClient(int clientFd, const std::string& message) const;
-		void							_sendErrNeedMoreParams(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
-		void							_sendErrAlreadyRegistered(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
-		void							_sendErrNoNickNameGiven(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
-		void							_sendErrOnUseNickName(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
-		void							_sendErrNickNameInUse(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
-		void							_sendErrBadChanMask(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
-		void							_sendErrUnknownCommand(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
-		void							_sendErrUnregistered(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
-		void							_sendErrPassMisMatch(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
-		void							_sendErrNotOnChannel(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
-		void							_sendErrNoSuchChannel(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
-		void							_sendErrNoRecipient(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
-		void							_sendErrNoTextToSend(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
-		void							_sendErrNoSuchNick(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
-		void							_sendErrCannotSendToChan(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
-		void							_sendErrChaNoPrivsNeeded(Client& cli, const std::string& nick, const s_Line& sline, const std::string& target) const;
 
+		void							_sendErrNeedMoreParams(Client& cli, const std::string& nick, const s_Line& sline, const std::string& cmd) const;
+		void							_sendErrAlreadyRegistered(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const;
+		void							_sendErrNoNickNameGiven(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const;
+		void							_sendErrOnUseNickName(Client& cli, const std::string& nick, const s_Line& sline, const std::string& targetNick) const;
+		void							_sendErrNickNameInUse(Client& cli, const std::string& nick, const s_Line& sline, const std::string& targetNick) const;
+		void							_sendErrBadChanMask(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
+		void							_sendErrUnknownCommand(Client& cli, const std::string& nick, const s_Line& sline, const std::string& cmd) const;
+		void							_sendErrUnregistered(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const;
+		void							_sendErrPassMisMatch(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const;
+		void							_sendErrNotOnChannel(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
+		void							_sendErrNoSuchChannel(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
+		void							_sendErrNoRecipient(Client& cli, const std::string& nick, const s_Line& sline, const std::string& cmd) const;
+		void							_sendErrNoTextToSend(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const;
+		void							_sendErrNoSuchNick(Client& cli, const std::string& nick, const s_Line& sline, const std::string& targetName) const;
+		void							_sendErrCannotSendToChan(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
+		void							_sendErrChaNoPrivsNeeded(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
+		void							_sendErrUserOnChannel(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
+		
+		
+		void							_sendRplInviteList(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const;
+		void							_sendEndOfInviteList(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const;
+		void							_sendRplInviting(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
+		
+		
 		// helper framing/parsing	
 		std::vector<std::string>		_splitCRLF(int clientFd);
 		std::string						_spaceTrim(const std::string& sline) const;
@@ -92,7 +100,7 @@ class Server {
 		std::vector<std::string>		_handleParams(std::string& sline);
 
 		// validation/execution	
-		bool							_dispatchCommand(int clientFd, const s_Line& sLine);
+		bool							_dispatchCommand(int clientFd, s_Line& sLine);
 
 		bool							_handlePass(Client& cli, const s_Line& sline);
 		bool							_handleNick(Client& cli, const s_Line& sline);
@@ -103,12 +111,13 @@ class Server {
 		bool							_handlePing(Client& cli, const s_Line& sline);
 		bool							_handlePrivmsg(Client& cli, const s_Line& sline);
 		bool							_handleKick(Client& cli, const s_Line& sline);
+		bool							_handleInvite(Client& cli, s_Line& sline);
 
 		// state update	
 		bool							_updateRegisteredState(int clientFd);
 		
 		// utils 	
-		std::string					_generateLogInfo(const s_Line& sline, const Client& cli, const std::string& info) const;
+		std::string						_generateLogInfo(const s_Line& sline, const Client& cli, const std::string& info) const;
 		void							_printLogServer(const std::string& type, const Client& cli, const s_Line& sline, const std::string& info) const;
 		void							_printServerInfo(void) const;
 		void    						_printLine(const Server::s_Line& sLine) const;

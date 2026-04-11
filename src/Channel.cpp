@@ -20,10 +20,10 @@ bool    Channel::isMember(int memberFd) const {
     return (_members.find(memberFd) != _members.end());
 }
 
-bool    Channel::addMember(int memberFd, bool isChanOp) {
+bool    Channel::addMember(int memberFd, bool isOp) {
     if (isMember(memberFd))
         return (false);
-    _members[memberFd] = MemberState(isChanOp);
+    _members[memberFd] = MemberState(isOp);
     return (true);
 }
 
@@ -47,6 +47,23 @@ bool    Channel::isChanOp(int memberFd) const {
 std::map<int, Channel::MemberState>&   Channel::getMembers(void) {
     return (_members);
 }
+
+bool    Channel::addInvite(int memberFd) {
+    return (_inviteList.insert(memberFd).second);
+}
+
+bool    Channel::removeInvite(int memberFd) {
+    return (_inviteList.erase(memberFd));
+}
+
+bool    Channel::isInvited(int memberFd) {
+    return (_inviteList.find(memberFd) != _inviteList.end());
+}
+
+bool    Channel::isMode(const std::string& mode) const {
+    return (_chanModeList.find(mode) != _chanModeList.end());
+}
+
 
 // void    Channel::notifyQuit(int memberFd, const std::string& msg) const {
 //     std::map<int, MemberState>::const_iterator  it = _members.begin();
