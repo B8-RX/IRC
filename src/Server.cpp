@@ -110,7 +110,7 @@ void	Server::_handleNewClient(void) {
 	_clientList.insert(std::make_pair(clientFd, client));
 	_pollfdList.push_back(newPollfd);
 
-	std::cout << YELLOW "\nnew connection established on fd " << "[" << clientFd << "]\n";
+	std::cout << MAGENTA "\nnew connection established on fd " << "[" << clientFd << "]\n";
 	std::cout << "address: [" << client.ipAddr << "]\n" << RESET;
 }
 

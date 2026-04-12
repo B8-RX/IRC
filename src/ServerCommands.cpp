@@ -61,6 +61,12 @@ bool	Server::_dispatchCommand(int clientFd, s_Line& sLine) {
 	return (true);
 }
 
+
+//? Command:  
+//? Parameters:  
+//? ===> 
+//? message <=== 
+//? message <=== 
 bool	Server::_handlePass(Client& cli, const s_Line& sline) {
 
 	// validation 
@@ -96,6 +102,11 @@ bool	Server::_handlePass(Client& cli, const s_Line& sline) {
 }
 
 
+//? Command:  
+//? Parameters:  
+//? ===> 
+//? message <=== 
+//? message <=== 
 bool	Server::_handleNick(Client& cli, const s_Line& sline) {
 	
 	// validation 
@@ -134,6 +145,12 @@ bool	Server::_handleNick(Client& cli, const s_Line& sline) {
 	return (true);
 }
 
+
+//? Command:  
+//? Parameters:  
+//? ===> 
+//? message <=== 
+//? message <=== 
 bool	Server::_handleUser(Client& cli, const s_Line& sline) {
 
 	// validation 
@@ -161,6 +178,12 @@ bool	Server::_handleUser(Client& cli, const s_Line& sline) {
 	return (true);
 }
 
+
+//? Command:  
+//? Parameters:  
+//? ===> 
+//? message <=== 
+//? message <=== 
 bool	Server::_handleJoin(Client& cli, const s_Line& sline) {
 	
 	// validation 
@@ -224,6 +247,12 @@ bool	Server::_handleJoin(Client& cli, const s_Line& sline) {
 	return (true);
 }
 
+
+//? Command:  
+//? Parameters:  
+//? ===> 
+//? message <=== 
+//? message <=== 
 bool	Server::_handlePart(Client& cli, const s_Line& sline) {
 
 	std::string	clientNick = (cli.getNickname().empty() ? "*" :  cli.getNickname());
@@ -281,6 +310,12 @@ bool	Server::_handlePart(Client& cli, const s_Line& sline) {
 	return (true);
 }
 
+
+//? Command:  
+//? Parameters:  
+//? ===> 
+//? message <=== 
+//? message <=== 
 // client send QUIT command to quit the server
 bool	Server::_handleQuit(Client& cli, const s_Line& sline) {
 
@@ -335,6 +370,12 @@ bool	Server::_handleQuit(Client& cli, const s_Line& sline) {
 	return (true);
 }
 
+
+//? Command:  
+//? Parameters:  
+//? ===> 
+//? message <=== 
+//? message <=== 
 bool	Server::_handlePing(Client& cli, const s_Line& sline) {
 
 	std::string clientNick = (cli.getNickname().empty() ? "*" : cli.getNickname());
@@ -349,6 +390,12 @@ bool	Server::_handlePing(Client& cli, const s_Line& sline) {
 	return (true);
 }
 
+
+//? Command: PRIVMSG 
+//? Parameters: <target>{,<target>} <text to be sent> 
+//? ===> PRIVMSG Angel :yes I'm receiving it ! ; Command to send a message to Angel.
+//? message <=== :Angel PRIVMSG Wiz :Hello are you receiving this message ? ; Message from Angel to Wiz.
+//? message <=== :dan!~h@localhost PRIVMSG #coolpeople :Hi everyone!  ; Message from dan to the channel #coolpeople
 bool	Server::_handlePrivmsg(Client& cli, const s_Line& sline) {
 
 	std::string clientNick = (cli.getNickname().empty() ? "*" : cli.getNickname());
@@ -437,7 +484,6 @@ bool	Server::_handlePrivmsg(Client& cli, const s_Line& sline) {
 //? ===> KICK #Finnish Matthew ; Command to kick Matthew from #Finnish
 //? ===> KICK #Finnish John :Speaking English; Command to kick John from #Finnish using "Speaking English" as the reason (comment).
 //? message <=== :WiZ!jto@tolsun.oulu.fi KICK #Finnish John; KICK message on channel #Finnish from WiZ to remove John from channel
-
 bool	Server::_handleKick(Client& cli, const s_Line& sline) {
 
 	// check params size
@@ -519,7 +565,6 @@ bool	Server::_handleKick(Client& cli, const s_Line& sline) {
 //? Parameters: <nickname> <channel>
 //? ====> INVITE Wiz #foo_bar    ; Invite Wiz to #foo_bar
 //? message <==== :dan-!d@localhost INVITE Wiz #test    ; dan- has invited Wiz to the channel #test
-
 bool	Server::_handleInvite(Client& cli, s_Line& sline) {
 
 	std::string	nick = cli.getNickname();
@@ -575,8 +620,8 @@ bool	Server::_handleInvite(Client& cli, s_Line& sline) {
 
 	// check if the user <nickname> is already member of the channel
 	//! ERR_USERONCHANNEL (443)
+	
 	Client* pUser = getClientByNick(targetUser);
-
 	if (pUser == NULL) {
 		_sendErrNoSuchNick(cli, nick, sline, targetUser);
 		return (false);
@@ -589,12 +634,12 @@ bool	Server::_handleInvite(Client& cli, s_Line& sline) {
 	pChan->addInvite(pUser->fd);
 	// send RPL_INVITING (341)  "<client> <nick> <channel>" to the issuer 
 	_sendRplInviting(cli, nick, sline, chanName);
+	
 	// send INVITE message to the invited user with issuer as <source>
 	std::string prefix = ":" + nick + "!" + cli.getUsername() + "@" + cli.ipAddr;
-	std::string message = CYAN + prefix + " INVITE " + targetUser + " " + chanName + std::string(RESET);
+	std::string message = prefix + " INVITE " + targetUser + " " + chanName;
 	_printLogServer("INFO", cli, sline, chanName);
 	_sendToClient(pUser->fd, message);
 	
 	return (true);
 }
-

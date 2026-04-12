@@ -312,16 +312,16 @@ void	Server::_sendErrChaNoPrivsNeeded(Client& cli, const std::string& nick, cons
 
 void	Server::_sendRplInviteList(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const {
 	(void)placeholder;
-	std::string	inviteChanList = "[";
+	std::string	inviteChanList = "(";
 	for (std::size_t i = 0; i < sline.params.size(); ++i) {
 		inviteChanList += sline.params[i];
 		if ((i + 1) < sline.params.size()) {
 			inviteChanList += ", ";
 		}
 	}
-	inviteChanList += "]";
+	inviteChanList += ")";
 	std::string	numeric = " 336 ";
-	std::string line = std::string(CYAN) + ":" + _serverName + numeric + nick + " " + inviteChanList + std::string(RESET); 
+	std::string line = ":" + _serverName + numeric + nick + " " + inviteChanList; 
 	_printLogServer("DEBUG", cli, sline, line);
 	_sendToClient(cli.fd, line);
 }
@@ -329,14 +329,15 @@ void	Server::_sendRplInviteList(Client& cli, const std::string& nick, const s_Li
 void	Server::_sendEndOfInviteList(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const {
 	(void)placeholder;
 	std::string	numeric = " 337 ";
-	std::string line = std::string(CYAN) + ":" + _serverName + numeric + nick + " :End of /INVITE list" + std::string(RESET); 
+	std::string line = ":" + _serverName + numeric + nick + " :End of /INVITE list"; 
 	_printLogServer("DEBUG", cli, sline, line);
 	_sendToClient(cli.fd, line);
 }
 
 void	Server::_sendRplInviting(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const {
 	std::string	numeric = " 341 ";
-	std::string line = std::string(CYAN) + ":" + _serverName + numeric + nick + chanName + std::string(RESET); 
+	std::string invitedUser = sline.params[0];
+	std::string line = ":" + _serverName + numeric +  nick + " " + invitedUser + " " + chanName; 
 	_printLogServer("DEBUG", cli, sline, line);
 	_sendToClient(cli.fd, line);
 }
