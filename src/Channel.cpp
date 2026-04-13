@@ -64,6 +64,29 @@ bool    Channel::isMode(const std::string& mode) const {
     return (_chanModeList.find(mode) != _chanModeList.end());
 }
 
+const std::string   Channel::getTopic(void) const {
+    return (_t_Topic.topic);
+}
+
+const std::string   Channel::getTopicAuthor(void) const {
+    return (_t_Topic.topicAuthor);
+}
+
+void    Channel::setTopic(const std::string& topic) {
+    _t_Topic.topic = topic;
+}
+
+void    Channel::setTopicAuthor(const std::string& author) {
+    _t_Topic.topicAuthor = author;
+}
+
+void    Channel::setTimestamp(void) {
+    _t_Topic.time = std::time(0);
+}
+
+std::time_t    Channel::getTimestamp(void) const {
+    return (_t_Topic.time);
+}
 
 // void    Channel::notifyQuit(int memberFd, const std::string& msg) const {
 //     std::map<int, MemberState>::const_iterator  it = _members.begin();

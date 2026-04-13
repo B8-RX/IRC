@@ -87,6 +87,9 @@ class Server {
 		void							_sendRplInviteList(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const;
 		void							_sendEndOfInviteList(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const;
 		void							_sendRplInviting(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
+		void							_sendRplNoTopic(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
+		void							_sendRplTopic(Client& cli, const std::string& nick, const s_Line& sline, const std::string& topic) const;
+		void							_sendRplWhoTime(Client& cli, const std::string& nick, const s_Line& sline, std::time_t time) const;
 		
 		
 		// helper framing/parsing	
@@ -112,6 +115,7 @@ class Server {
 		bool							_handlePrivmsg(Client& cli, const s_Line& sline);
 		bool							_handleKick(Client& cli, const s_Line& sline);
 		bool							_handleInvite(Client& cli, s_Line& sline);
+		bool							_handleTopic(Client& cli, s_Line& sline);
 
 		// state update	
 		bool							_updateRegisteredState(int clientFd);

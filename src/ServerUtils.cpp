@@ -4,7 +4,7 @@
 #include <iostream>
 #include <cerrno>
 #include <cstring>
-
+#include <sstream>
 
 void    Server::_printLine(const Server::s_Line& sLine) const {
 	std::cout << "raw line: [" << sLine.raw << "]\n";
@@ -91,6 +91,14 @@ std::string	Server::_generateLogInfo(const s_Line& sline, const Client& cli, con
 		std::string invitedUser = sline.params[0];
 		std::string chanName = sline.params[1];
 		message = std::string(YELLOW) + nickName + std::string(GREEN) + " invited " + std::string(YELLOW) + invitedUser + std::string(GREEN) + " to channel " + std::string(YELLOW) + chanName + std::string(GREEN); 
+	}
+	else if (sline.command == "TOPIC") {
+		std::string chanName = info;
+		std::string sujet = " requested topic info of the channel ";
+		if (sline.params.size() > 1) {
+			sujet = " edit the topic of the channel ";
+		}
+		message = std::string(YELLOW) + nickName + std::string(GREEN) + sujet + std::string(YELLOW) + chanName + std::string(GREEN);  
 	}
 	return (message);
 }
@@ -338,6 +346,32 @@ void	Server::_sendRplInviting(Client& cli, const std::string& nick, const s_Line
 	std::string	numeric = " 341 ";
 	std::string invitedUser = sline.params[0];
 	std::string line = ":" + _serverName + numeric +  nick + " " + invitedUser + " " + chanName; 
+	_printLogServer("DEBUG", cli, sline, line);
+	_sendToClient(cli.fd, line);
+}
+
+void	Server::_sendRplNoTopic(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const {
+	(void)nick;
+	std::string	numeric = " 331 ";
+	std::string line = ":" + _serverName + numeric + chanName + " :No topic is set"; 
+	_printLogServer("DEBUG", cli, sline, line);
+	_sendToClient(cli.fd, line);
+}
+
+void	Server::_sendRplTopic(Client& cli, const std::string& nick, const s_Line& sline, const std::string& topic) const {
+	(void)nick;
+	std::string numeric = " 332 ";
+	std::string line = ":" + _serverName + numeric + sline.params[0] + " :" + topic; 
+	_printLogServer("DEBUG", cli, sline, line);
+	_sendToClient(cli.fd, line);
+}
+
+void	Server::_sendRplWhoTime(Client& cli, const std::string& nick, const s_Line& sline, std::time_t time) const {
+	(void)nick;
+	std::string numeric = " 333 ";
+	std::ostringstream oss;
+	oss << time;
+	std::string line = ":" + _serverName + numeric + sline.params[0] + " " + nick + " :" + oss.str(); 
 	_printLogServer("DEBUG", cli, sline, line);
 	_sendToClient(cli.fd, line);
 }

@@ -157,10 +157,6 @@ void	Server::_handleReceivedData(int clientFd) {
 		sLine = _parseLine(vLines[i]);
 		_dispatchCommand(clientFd, sLine);
 	}
-	// if (_clientList.find(clientFd) != _clientList.end()) {
-	// 	_printClient(*pCli);
-	// }
-	// _printServerInfo();
 }
 
 bool	Server::_updateRegisteredState(int clientFd) {

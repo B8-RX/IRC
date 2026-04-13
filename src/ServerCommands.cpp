@@ -7,7 +7,7 @@ bool	Server::_dispatchCommand(int clientFd, s_Line& sLine) {
 	
 	Client* pCli = getClient(clientFd);
 	if (pCli == NULL) {
-		return (NULL);
+		return (false);
 	}
 	std::string clientNick = pCli->getNickname();
 	if (clientNick.empty()) {
@@ -48,6 +48,9 @@ bool	Server::_dispatchCommand(int clientFd, s_Line& sLine) {
 		}
 		else if (sLine.command == "INVITE") {
 			return (_handleInvite(*pCli, sLine));
+		}
+		else if (sLine.command == "TOPIC") {
+			return (_handleTopic(*pCli, sLine));
 		}
 		else {
 			_sendErrUnknownCommand(*pCli, clientNick, sLine, sLine.command);
@@ -200,27 +203,27 @@ bool	Server::_handleJoin(Client& cli, const s_Line& sline) {
 	std::string chanParam = sline.params[0];
 	while (!chanParam.empty()) {
 		std::size_t commaPos = chanParam.find(',');
-		std::string	chanName;
+		std::string	channelName;
 		if (commaPos == std::string::npos)
 		{
-			chanName = chanParam;
+			channelName = chanParam;
 			chanParam.clear();
 		}
 		else {
-			chanName = chanParam.substr(0, commaPos);
+			channelName = chanParam.substr(0, commaPos);
 			chanParam.erase(0, commaPos + 1);
 		}
-		if (chanName.empty()) {
+		if (channelName.empty()) {
 			continue;
 		}
-		if (chanName.size() <= 1 || chanName[0] != '#') {
-			_sendErrBadChanMask(cli, clientNick, sline, chanName);
+		if (channelName.size() <= 1 || channelName[0] != '#') {
+			_sendErrBadChanMask(cli, clientNick, sline, channelName);
 			continue;
 		}
-		if (_channelList.find(chanName) == _channelList.end()) {
-			_channelList.insert(std::make_pair(chanName, Channel(chanName)));
+		if (_channelList.find(channelName) == _channelList.end()) {
+			_channelList.insert(std::make_pair(channelName, Channel(channelName)));
 		}
-		Channel* pChan = getChannel(chanName);
+		Channel* pChan = getChannel(channelName);
 		if (pChan == NULL) {
 			continue;
 		} 
@@ -234,11 +237,11 @@ bool	Server::_handleJoin(Client& cli, const s_Line& sline) {
 			std::cerr << "channel [" << pChan->getName() << "]: Error occured. Cannot add member [" << cli.getNickname() << "] to the channel!\n";
 			return (false);
 		}
-		if (!cli.isMemberChan(chanName)) {
-			cli.addSubscriptionChan(chanName);
+		if (!cli.isMemberChan(channelName)) {
+			cli.addSubscriptionChan(channelName);
 		}
-		_printLogServer("INFO", cli, sline, chanName);
-
+		_printLogServer("INFO", cli, sline, channelName);
+		_sendRplTopic(cli, clientNick, sline, pChan->getTopic()); 
 		//TODO send messages see JOIN part in the modern IRC documentation
 		// _printChannel(chan); //! define a DEBUG macro, when true true it will trigger this logs
 		//!TODO handle multiple keys (sline.params[1]) separated by colon see documentation of JOIN cmd.
@@ -264,46 +267,46 @@ bool	Server::_handlePart(Client& cli, const s_Line& sline) {
 	std::string reason = (sline.params.size() > 1 ? sline.params[1] : "");
 	while (!chanParam.empty())
 	{
-		std::size_t commaPos = chanParam.find(',');
-		std::string 								chanName;
+		std::size_t	commaPos = chanParam.find(',');
+		std::string channelName;
 		if (commaPos == std::string::npos)
 		{
-			chanName = chanParam;
+			channelName = chanParam;
 			chanParam.clear();
 		}
 		else {
-			chanName = chanParam.substr(0, commaPos);
+			channelName = chanParam.substr(0, commaPos);
 			chanParam.erase(0, commaPos + 1);
 		}
-		if (chanName.empty())
+		if (channelName.empty())
 			continue;
-		Channel*	pChan = getChannel(chanName);
+		Channel*	pChan = getChannel(channelName);
 		if (pChan != NULL) {
 			if (pChan->isMember(cli.fd)) {
 				const std::map<int, Channel::MemberState>&	chanMembers = pChan->getMembers();
 				std::map<int, Channel::MemberState>::const_iterator membersIt = chanMembers.begin();
 				for (; membersIt != chanMembers.end(); ++membersIt) {
 					std::string prefix = ":" + clientNick + "!" + cli.getUsername() + "@" + cli.ipAddr;
-					std::string message = CYAN + prefix + " " + sline.command + " " + chanName + std::string(RESET);
+					std::string message = CYAN + prefix + " " + sline.command + " " + channelName + std::string(RESET);
 					if (!reason.empty()) {
 						message += " :"  + std::string(RESET) + reason;
 					}
 					_sendToClient(membersIt->first, message);
 				}
 				pChan->removeMember(cli.fd);
-				cli.removeSubscribedChannel(chanName);
-				_printLogServer("INFO", cli, sline, chanName);
+				cli.removeSubscribedChannel(channelName);
+				_printLogServer("INFO", cli, sline, channelName);
 				if (pChan->empty()) {
-					_channelList.erase(_channelList.find(chanName));
-					std::cout << "channel [" << chanName << "] have 0 member. Channel have been deleted successfully.\n";
+					_channelList.erase(_channelList.find(channelName));
+					std::cout << "channel [" << channelName << "] have 0 member. Channel have been deleted successfully.\n";
 				}
 			}
 			else {
-				_sendErrNotOnChannel(cli, clientNick, sline, chanName);
+				_sendErrNotOnChannel(cli, clientNick, sline, channelName);
 			}
 		}
 		else {
-			_sendErrNoSuchChannel(cli, clientNick, sline, chanName);
+			_sendErrNoSuchChannel(cli, clientNick, sline, channelName);
 		}
 
 	}
@@ -334,8 +337,8 @@ bool	Server::_handleQuit(Client& cli, const s_Line& sline) {
 
 	// loop on the client's channel list
 	for (std::size_t i = 0; i < cliChannels.size(); ++i) {
-		std::string			chanName = cliChannels[i];
-		std::map<std::string, Channel>::iterator chanIt = _channelList.find(chanName);
+		std::string			channelName = cliChannels[i];
+		std::map<std::string, Channel>::iterator chanIt = _channelList.find(channelName);
 		if (chanIt == _channelList.end()) {
 			continue;
 		}
@@ -485,37 +488,41 @@ bool	Server::_handlePrivmsg(Client& cli, const s_Line& sline) {
 //? ===> KICK #Finnish John :Speaking English; Command to kick John from #Finnish using "Speaking English" as the reason (comment).
 //? message <=== :WiZ!jto@tolsun.oulu.fi KICK #Finnish John; KICK message on channel #Finnish from WiZ to remove John from channel
 bool	Server::_handleKick(Client& cli, const s_Line& sline) {
+	std::string	clientNick = cli.getNickname();
 
+	if (clientNick.empty()) {
+		clientNick = "*";
+	}
 	// check params size
 	//! ERR_NEEDMOREPARAMS (461)   "<client> <command> :Not enough parameters"
 	if (sline.params.size() < 2) {
-		_sendErrNeedMoreParams(cli, cli.getNickname(), sline, sline.command);
+		_sendErrNeedMoreParams(cli, clientNick, sline, sline.command);
 		return (false);
 	}                           	                                                                    
 
-	std::string chanName = sline.params[0];
+	std::string channelName = sline.params[0];
 	// check channel if exist
 	//! ERR_NOSUCHCHANNEL (403) "<client> <channel> :No such channel"
-	Channel* pChan = getChannel(chanName);
+	Channel* pChan = getChannel(channelName);
 	if (pChan == NULL) {
-		_sendErrNoSuchChannel(cli, cli.getNickname(), sline, chanName);
+		_sendErrNoSuchChannel(cli, clientNick, sline, channelName);
 		return (false);
 	}
 	// check op privileges of the client
 	//! ERR_NOTONCHANNEL (442)  "<client> <channel> :You're not on that channel"
 	//! ERR_CHANOPRIVSNEEDED (482)  "<client> <channel> :You're not channel operator"
 	if (pChan->isMember(cli.fd) == false) {
-		_sendErrNotOnChannel(cli, cli.getNickname(), sline, chanName);
+		_sendErrNotOnChannel(cli, clientNick, sline, channelName);
 		return (false);
 	}
 	if (pChan->isChanOp(cli.fd) == false) {
-		_sendErrChaNoPrivsNeeded(cli, cli.getNickname(), sline, chanName);
+		_sendErrChaNoPrivsNeeded(cli, clientNick, sline, channelName);
 		return (false);
 	}
 	std::string	userParam = sline.params[1];
 	std::string userName;
 	std::string reason = (sline.params.size() >= 3 ? sline.params[2] : "");
-	std::string prefix = ":" + cli.getNickname() + "!" + cli.getUsername() + "@" + cli.ipAddr;
+	std::string prefix = ":" + clientNick + "!" + cli.getUsername() + "@" + cli.ipAddr;
 
 	while (!userParam.empty()) {
 		std::size_t commaPos = userParam.find(',');
@@ -537,14 +544,14 @@ bool	Server::_handleKick(Client& cli, const s_Line& sline) {
 			continue;
 		}
 		if (pChan->isMember(user->fd) == false) {
-			_sendErrNotOnChannel(cli, user->getNickname(), sline, chanName);
+			_sendErrNotOnChannel(cli, user->getNickname(), sline, channelName);
 			continue;
 		}
 		const std::map<int, Channel::MemberState>& membList = pChan->getMembers();
 		std::map<int, Channel::MemberState>::const_iterator membIt = membList.begin();
-		std::string message = CYAN + prefix + " " + sline.command + " " + chanName + " " + user->getNickname();
+		std::string message = prefix + " " + sline.command + " " + channelName + " " + user->getNickname();
 		if (!reason.empty()) {
-			message += " reason:" + std::string(RED) + "(" + reason + ")" + std::string(RESET);
+			message += " reason:(" + reason + ")";
 		}
 		for (; membIt != membList.end(); ++membIt) {
 			_sendToClient(membIt->first, message);
@@ -567,10 +574,10 @@ bool	Server::_handleKick(Client& cli, const s_Line& sline) {
 //? message <==== :dan-!d@localhost INVITE Wiz #test    ; dan- has invited Wiz to the channel #test
 bool	Server::_handleInvite(Client& cli, s_Line& sline) {
 
-	std::string	nick = cli.getNickname();
+	std::string	clientNick = cli.getNickname();
 
-	if (nick.empty()) {
-		nick = "*";
+	if (clientNick.empty()) {
+		clientNick = "*";
 	}
 	// check if 2 parameters
 	//! ERR_NEEDMOREPARAMS (461) 
@@ -583,38 +590,38 @@ bool	Server::_handleInvite(Client& cli, s_Line& sline) {
 					sline.params.push_back(chanIt->first);
 				}
 			}
-			_sendRplInviteList(cli, nick, sline, "");
-			_sendEndOfInviteList(cli, nick, sline, "");
+			_sendRplInviteList(cli, clientNick, sline, "");
+			_sendEndOfInviteList(cli, clientNick, sline, "");
 			return (true);
 		}
 		else {
-			_sendErrNeedMoreParams(cli, nick, sline, sline.command);
+			_sendErrNeedMoreParams(cli, clientNick, sline, sline.command);
 			return (false);
 		}
 	}
 
 	std::string	targetUser = sline.params[0];
-	std::string chanName = sline.params[1];
+	std::string channelName = sline.params[1];
 
 	// check if the channel exist
 	//! ERR_NOSUCHCHANNEL (403)
-	Channel*	pChan = getChannel(chanName);
+	Channel*	pChan = getChannel(channelName);
 	if (pChan == NULL) {
-		_sendErrNoSuchChannel(cli, nick, sline, chanName);
+		_sendErrNoSuchChannel(cli, clientNick, sline, channelName);
 		return (false);
 	}
 
 	// check if the client is member of the channel
 	//! ERR_NOTONCHANNEL (442)
 	if (pChan->isMember(cli.fd) == false) {
-		_sendErrNotOnChannel(cli, nick, sline, chanName);
+		_sendErrNotOnChannel(cli, clientNick, sline, channelName);
 		return (false);
 	}
 
 	// if the mode Invite_only is activated check if the client have the operator privileges
 	//! ERR_CHANOPRIVSNEEDED (482)
 	if (pChan->isMode("i") && !pChan->isChanOp(cli.fd)) {
-		_sendErrChaNoPrivsNeeded(cli, nick, sline, chanName);
+		_sendErrChaNoPrivsNeeded(cli, clientNick, sline, channelName);
 		return (false);
 	}
 
@@ -623,23 +630,96 @@ bool	Server::_handleInvite(Client& cli, s_Line& sline) {
 	
 	Client* pUser = getClientByNick(targetUser);
 	if (pUser == NULL) {
-		_sendErrNoSuchNick(cli, nick, sline, targetUser);
+		_sendErrNoSuchNick(cli, clientNick, sline, targetUser);
 		return (false);
 	}
 	if (pChan->isMember(pUser->fd)) {
-		_sendErrUserOnChannel(cli, nick, sline, chanName);
+		_sendErrUserOnChannel(cli, clientNick, sline, channelName);
 		return (false);
 	}
 
 	pChan->addInvite(pUser->fd);
-	// send RPL_INVITING (341)  "<client> <nick> <channel>" to the issuer 
-	_sendRplInviting(cli, nick, sline, chanName);
+	//? send RPL_INVITING (341)  "<client> <nick> <channel>" to the issuer 
+	_sendRplInviting(cli, clientNick, sline, channelName);
 	
-	// send INVITE message to the invited user with issuer as <source>
-	std::string prefix = ":" + nick + "!" + cli.getUsername() + "@" + cli.ipAddr;
-	std::string message = prefix + " INVITE " + targetUser + " " + chanName;
-	_printLogServer("INFO", cli, sline, chanName);
+	//? send INVITE message to the invited user with issuer as <source>
+	std::string prefix = ":" + clientNick + "!" + cli.getUsername() + "@" + cli.ipAddr;
+	std::string message = prefix + " INVITE " + targetUser + " " + channelName;
+	_printLogServer("INFO", cli, sline, channelName);
 	_sendToClient(pUser->fd, message);
 	
+	return (true);
+}
+
+//? Command: TOPIC
+//? Parameters: <channel> [<topic>]
+//? ===> TOPIC #test :New topic		; Setting the topic on "#test" to "New topic".
+//? ===> TOPIC #test :				; Clearing the topic on "#test"
+//? ===> TOPIC #test				; Checking the topic for "#test"
+bool	Server::_handleTopic(Client& cli, s_Line& sline) {
+	std::string	clientNick = cli.getNickname();
+
+	if (clientNick.empty()) {
+		clientNick = "*";
+	}
+
+	// check if there is minimum 1 params
+	//!  ERR_NEEDMOREPARAMS (461) 
+	if (sline.params.empty()) {
+		_sendErrNeedMoreParams(cli, clientNick, sline, sline.command);
+		return (false);
+	}
+
+	// check if the channel exist
+	//! EER_NOSUCHCHANNEL (403)
+	std::string	channelName = sline.params[0];
+	Channel*	pChan = getChannel(channelName);
+
+	if (pChan == NULL) {
+		_sendErrNoSuchChannel(cli, clientNick, sline, channelName);
+		return (false);
+	}
+
+	// check if the issuer is on the channel
+	//!  ERR_NOTONCHANNEL (442) 
+	if (!pChan->isMember(cli.fd)) {
+		_sendErrNotOnChannel(cli, clientNick, sline, channelName);
+		return (false);
+	}
+
+	// check if the protected mode is enable "t", if yes check if the issuer is an operator
+	//!  ERR_CHANOPRIVSNEEDED (482) 
+	if (pChan->isMode("t") && !pChan->isChanOp(cli.fd)) {
+		_sendErrChaNoPrivsNeeded(cli, clientNick, sline, channelName);
+		return (false);
+	}
+
+	// if no [<topic>] is given, send RPL_TOPIC or RPL_NOTOPIC
+	//?  RPL_NOTOPIC (331) /  RPL_TOPIC (332) 
+	if (sline.params.size() == 1) {
+		if (pChan->getTopic().empty()) {
+			_sendRplNoTopic(cli, clientNick, sline, channelName);
+		}
+		else {
+			_sendRplTopic(cli, clientNick, sline, pChan->getTopic());
+			_sendRplWhoTime(cli, clientNick, sline, pChan->getTimestamp());
+		}
+		_printLogServer("INFO", cli, sline, channelName);
+	}
+	else {
+		std::string topic = sline.params[1];
+		pChan->setTopic(topic);
+		pChan->setTopicAuthor(clientNick);
+		pChan->setTimestamp();
+		_printLogServer("INFO", cli, sline, channelName);
+		//? when topic is changed or cleared send a TOPIC command to every client on the channel also the author of the topic change
+		std::string message = ":"  + _serverName + " " + channelName + " :" + topic;
+		const std::map<int, Channel::MemberState>&	members = pChan->getMembers();
+		std::map<int, Channel::MemberState>::const_iterator membersIt = members.begin();
+		for (; membersIt != members.end(); ++membersIt) {
+			_sendToClient(membersIt->first, message);
+		}  
+	}
+
 	return (true);
 }

@@ -11,9 +11,12 @@ Pas obligatoire, mais ça peut éviter un énorme Server.cpp.
 - RPL_info welcom....
 - PRIVMSG multiple target ex: #chan1,user2,#chan2... DONE
 - SERVER MUST  SEND TO CLIENTS ACKNOLEDGMENT TO SAY THEIR NICK COMMAND WAS SUCCESSFUL, AND TELL OTHER CLIENTS ABOUT THE CHANGE OF NICKNAME. <source> of the message will be the old nickname 
-- Finish server logs for PASS USER NICK JOIN PART QUIT PING PRIVMSG KICK
+- Finish server logs for commands: MODE
 
-- INVITE TOPIC MODE
+- TOPIC
+
+- MODE
+
 
 DOCUMENTATION LEGENDS
 | Symbole | Signification  |    |
