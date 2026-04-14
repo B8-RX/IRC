@@ -5,17 +5,36 @@ Pas obligatoire, mais ça peut éviter un énorme Server.cpp.
 	/* TODO: FRAMING */ //!done 
 	/* TODO: PARSING */ //!done
 	/* TODO: VALIDATE COMBINAISON */ //!done
-	/* TODO: EXECUTE */ //!done : PASS, NICK, USER, PING, JOIN, QUIT, PRIVMSG //! REST: KICK, MODE...
+	/* TODO: EXECUTE */ //!done : PASS, NICK, USER, PING, JOIN, QUIT, PRIVMSG, KICK, INVITE, TOPIC */ //!done //! REST: MODE
 
-- JOIN multiple keys
-- RPL_info welcom....
-- PRIVMSG multiple target ex: #chan1,user2,#chan2... DONE
-- SERVER MUST  SEND TO CLIENTS ACKNOLEDGMENT TO SAY THEIR NICK COMMAND WAS SUCCESSFUL, AND TELL OTHER CLIENTS ABOUT THE CHANGE OF NICKNAME. <source> of the message will be the old nickname 
-- Finish server logs for commands: MODE
+- JOIN multiple keys (second param) bind the multiple channels (first param)
+- RPL_info welcome....
+- SERVER MUST  SEND TO CLIENTS ACKNOLEDGMENT TO SAY THEIR NICK COMMAND WAS SUCCESSFUL,
+		AND TELL OTHER CLIENTS ABOUT THE CHANGE OF NICKNAME. <source> of the message will be the old nickname 
+
+- INVITE DONE
 
 - TOPIC
 
 - MODE
+
+//////////////////
+- when the op channel quit/part the server/channel do i nominate another chanOp ? 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 DOCUMENTATION LEGENDS

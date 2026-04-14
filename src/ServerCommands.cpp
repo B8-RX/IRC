@@ -216,7 +216,7 @@ bool	Server::_handleJoin(Client& cli, const s_Line& sline) {
 		if (channelName.empty()) {
 			continue;
 		}
-		if (channelName.size() <= 1 || channelName[0] != '#') {
+		if (!_isValidChannelName(channelName)) {
 			_sendErrBadChanMask(cli, clientNick, sline, channelName);
 			continue;
 		}
@@ -642,7 +642,7 @@ bool	Server::_handleInvite(Client& cli, s_Line& sline) {
 	//? send RPL_INVITING (341)  "<client> <nick> <channel>" to the issuer 
 	_sendRplInviting(cli, clientNick, sline, channelName);
 	
-	//? send INVITE message to the invited user with issuer as <source>
+	//? Broadcast INVITE message to the invited user with issuer as <source>
 	std::string prefix = ":" + clientNick + "!" + cli.getUsername() + "@" + cli.ipAddr;
 	std::string message = prefix + " INVITE " + targetUser + " " + channelName;
 	_printLogServer("INFO", cli, sline, channelName);
@@ -687,39 +687,41 @@ bool	Server::_handleTopic(Client& cli, s_Line& sline) {
 		return (false);
 	}
 
-	// check if the protected mode is enable "t", if yes check if the issuer is an operator
-	//!  ERR_CHANOPRIVSNEEDED (482) 
-	if (pChan->isMode("t") && !pChan->isChanOp(cli.fd)) {
-		_sendErrChaNoPrivsNeeded(cli, clientNick, sline, channelName);
-		return (false);
-	}
 
 	// if no [<topic>] is given, send RPL_TOPIC or RPL_NOTOPIC
 	//?  RPL_NOTOPIC (331) /  RPL_TOPIC (332) 
+
 	if (sline.params.size() == 1) {
 		if (pChan->getTopic().empty()) {
 			_sendRplNoTopic(cli, clientNick, sline, channelName);
 		}
 		else {
 			_sendRplTopic(cli, clientNick, sline, pChan->getTopic());
-			_sendRplWhoTime(cli, clientNick, sline, pChan->getTimestamp());
+			_sendRplWhoTime(cli, clientNick, sline, pChan->t_Topic);
 		}
 		_printLogServer("INFO", cli, sline, channelName);
 	}
 	else {
+		// If the client want to modifiy the topic (sline.params[1]), check if the protected mode is enable "t", if yes check if the issuer is an operator
+		//!  ERR_CHANOPRIVSNEEDED (482) 
+		if (pChan->isMode("t") && !pChan->isChanOp(cli.fd)) {
+			_sendErrChaNoPrivsNeeded(cli, clientNick, sline, channelName);
+			return (false);
+		}
 		std::string topic = sline.params[1];
 		pChan->setTopic(topic);
 		pChan->setTopicAuthor(clientNick);
 		pChan->setTimestamp();
 		_printLogServer("INFO", cli, sline, channelName);
-		//? when topic is changed or cleared send a TOPIC command to every client on the channel also the author of the topic change
-		std::string message = ":"  + _serverName + " " + channelName + " :" + topic;
+
+		//? Broadcast a TOPIC command to every client on the channel also for the author
+		std::string prefix = ":" + clientNick + "!" + cli.getUsername() + "@" + cli.ipAddr;
+		std::string message = prefix + " TOPIC " + channelName + " :" + topic;
 		const std::map<int, Channel::MemberState>&	members = pChan->getMembers();
 		std::map<int, Channel::MemberState>::const_iterator membersIt = members.begin();
 		for (; membersIt != members.end(); ++membersIt) {
 			_sendToClient(membersIt->first, message);
 		}  
 	}
-
 	return (true);
 }

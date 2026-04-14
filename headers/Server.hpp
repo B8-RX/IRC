@@ -89,7 +89,7 @@ class Server {
 		void							_sendRplInviting(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
 		void							_sendRplNoTopic(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
 		void							_sendRplTopic(Client& cli, const std::string& nick, const s_Line& sline, const std::string& topic) const;
-		void							_sendRplWhoTime(Client& cli, const std::string& nick, const s_Line& sline, std::time_t time) const;
+		void							_sendRplWhoTime(Client& cli, const std::string& nick, const s_Line& sline, const Channel::s_Topic& topic) const;
 		
 		
 		// helper framing/parsing	
@@ -129,7 +129,7 @@ class Server {
 		void							_printChannel(Channel& channel) const;
 		bool    						_isValidNick(const std::string& nick) const;
 		bool							_isUsedNick(std::map<int, Client>& ClientsList, const std::string& nick, int clientFd) const;
-
+		bool							_isValidChannelName(const std::string& name) const;
 	public:
 		static void	sighandler(int signum);
 		class	ErrorException : public std::exception {

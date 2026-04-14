@@ -179,6 +179,19 @@ bool    Server::_isUsedNick(std::map<int, Client>& ClientsList, const std::strin
 	}
 	return (false);
 }
+
+bool    Server::_isValidChannelName(const std::string& name) const {
+	std::string	disallowedChar = ":# ,\r\n"; 
+	if (name.size() <= 1 || name[0] != '#')
+		return (false);
+	for (std::size_t i = 1; i < name.size(); ++i) {
+		if (disallowedChar.find(name[i]) != std::string::npos)
+			return (false);
+	}
+	return (true);
+}
+
+
 void	Server::_sendToClient(int clientFd, const std::string& message) const {
 	std::string	line = message + "\r\n";
 	ssize_t 	sent = send(clientFd, line.c_str(), line.size(), 0);
@@ -345,33 +358,30 @@ void	Server::_sendEndOfInviteList(Client& cli, const std::string& nick, const s_
 void	Server::_sendRplInviting(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const {
 	std::string	numeric = " 341 ";
 	std::string invitedUser = sline.params[0];
-	std::string line = ":" + _serverName + numeric +  nick + " " + invitedUser + " " + chanName; 
+	std::string line = ":" + _serverName + numeric + nick + " " + invitedUser + " " + chanName; 
 	_printLogServer("DEBUG", cli, sline, line);
 	_sendToClient(cli.fd, line);
 }
 
 void	Server::_sendRplNoTopic(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const {
-	(void)nick;
 	std::string	numeric = " 331 ";
-	std::string line = ":" + _serverName + numeric + chanName + " :No topic is set"; 
+	std::string line = ":" + _serverName + numeric + nick + " " + chanName + " :No topic is set"; 
 	_printLogServer("DEBUG", cli, sline, line);
 	_sendToClient(cli.fd, line);
 }
 
 void	Server::_sendRplTopic(Client& cli, const std::string& nick, const s_Line& sline, const std::string& topic) const {
-	(void)nick;
 	std::string numeric = " 332 ";
-	std::string line = ":" + _serverName + numeric + sline.params[0] + " :" + topic; 
+	std::string line = ":" + _serverName + numeric + nick + " " + sline.params[0] + " :" + topic; 
 	_printLogServer("DEBUG", cli, sline, line);
 	_sendToClient(cli.fd, line);
 }
 
-void	Server::_sendRplWhoTime(Client& cli, const std::string& nick, const s_Line& sline, std::time_t time) const {
-	(void)nick;
+void	Server::_sendRplWhoTime(Client& cli, const std::string& nick, const s_Line& sline, const Channel::s_Topic& topic) const {
 	std::string numeric = " 333 ";
 	std::ostringstream oss;
-	oss << time;
-	std::string line = ":" + _serverName + numeric + sline.params[0] + " " + nick + " :" + oss.str(); 
+	oss << topic.time;
+	std::string line = ":" + _serverName + numeric + nick + " " + sline.params[0] + " " + topic.topicAuthor + " " + oss.str(); 
 	_printLogServer("DEBUG", cli, sline, line);
 	_sendToClient(cli.fd, line);
 }

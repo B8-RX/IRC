@@ -43,16 +43,16 @@
 		void						setTopicAuthor(const std::string& author);
 		void						setTimestamp(void);
 		std::time_t					getTimestamp(void) const;
+		struct s_Topic {
+			std::string	topic;
+			std::string	topicAuthor;
+			std::time_t	time;
+		} t_Topic;
 	private:
 		std::string                 _name;
 		std::map<int, MemberState>  _members;
 		std::set<int>               _inviteList;
 		std::set<std::string>       _chanModeList; // i, t, k, o, l
-		struct s_Topic {
-			std::string	topic;
-			std::string	topicAuthor;
-			std::time_t	time;
-		} _t_Topic;
  };
 
 #endif // !CHANNEL_HPP
