@@ -82,6 +82,9 @@ class Server {
 		void							_sendErrCannotSendToChan(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
 		void							_sendErrChaNoPrivsNeeded(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
 		void							_sendErrUserOnChannel(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
+		void							_sendErrChanIsFull(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
+		void							_sendErrBadChannelKey(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
+		void							_sendErrInviteOnlyChan(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
 		
 		
 		void							_sendRplInviteList(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const;
@@ -89,8 +92,11 @@ class Server {
 		void							_sendRplInviting(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
 		void							_sendRplNoTopic(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
 		void							_sendRplTopic(Client& cli, const std::string& nick, const s_Line& sline, const std::string& topic) const;
-		void							_sendRplWhoTime(Client& cli, const std::string& nick, const s_Line& sline, const Channel::s_Topic& topic) const;
+		void							_sendRplWhoTime(Client& cli, const std::string& nick, const s_Line& sline, const Channel::s_Topic& sTopic) const;
+		void							_sendRplChannelModeIs(Client& cli, const std::string& nick, const s_Line& sline, const std::string& modeStringAndParams) const;
+		void							_sendRplCreationTime(Client& cli, const std::string& nick, const s_Line& sline, const time_t& creationTime) const;
 		
+
 		
 		// helper framing/parsing	
 		std::vector<std::string>		_splitCRLF(int clientFd);
@@ -116,6 +122,7 @@ class Server {
 		bool							_handleKick(Client& cli, const s_Line& sline);
 		bool							_handleInvite(Client& cli, s_Line& sline);
 		bool							_handleTopic(Client& cli, s_Line& sline);
+		bool							_handleMode(Client& cli, s_Line& sline);
 
 		// state update	
 		bool							_updateRegisteredState(int clientFd);

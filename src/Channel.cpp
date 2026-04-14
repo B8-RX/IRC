@@ -1,104 +1,209 @@
 #include "Channel.hpp"
+#include <sstream>
 
-Channel::Channel(void) : _name("") {}
-Channel::Channel(const std::string& name) : _name(name) {}
+Channel::Channel(void) : _name(""), _creationTime(std::time(0)), _inviteOnly(false), _topicRestricted(false), _limitEnabled(false), _keyEnabled(false) {}
+Channel::Channel(const std::string& name) : _name(name), _creationTime(std::time(0)), _inviteOnly(false), _topicRestricted(false), _limitEnabled(false), _keyEnabled(false) {}
 Channel::~Channel(void) {}
 
 const std::string& Channel::getName(void) const {
-    return (_name);
+	return (_name);
+}
+
+const time_t& Channel::getCreationTime(void) const {
+	return (_creationTime);
 }
 
 bool    Channel::empty(void) const {
-    return (_members.empty());
+	return (_members.empty());
 }
 
 std::size_t Channel::memberCount(void) const {
-    return (_members.size());
+	return (_members.size());
 }
 
 bool    Channel::isMember(int memberFd) const {
-    return (_members.find(memberFd) != _members.end());
+	return (_members.find(memberFd) != _members.end());
 }
 
 bool    Channel::addMember(int memberFd, bool isOp) {
-    if (isMember(memberFd))
-        return (false);
-    _members[memberFd] = MemberState(isOp);
-    return (true);
+	if (isMember(memberFd))
+		return (false);
+	_members[memberFd] = MemberState(isOp);
+	return (true);
 }
 
 bool    Channel::removeMember(int memberFd) {
-    std::map<int, MemberState>::iterator it = _members.find(memberFd);
+	std::map<int, MemberState>::iterator it = _members.find(memberFd);
 
-    if (it == _members.end())
-        return (false);
-    _members.erase(it);
-    return (true);
+	if (it == _members.end())
+		return (false);
+	_inviteList.erase(memberFd);
+	_members.erase(it);
+	return (true);
 }
 
 bool    Channel::isChanOp(int memberFd) const {
-    std::map<int, MemberState>::const_iterator it = _members.find(memberFd);
+	std::map<int, MemberState>::const_iterator it = _members.find(memberFd);
 
-    if (it == _members.end())
-        return (false);
-    return (it->second.isChanOp);
+	if (it == _members.end())
+		return (false);
+	return (it->second.isChanOp);
 }
 
 std::map<int, Channel::MemberState>&   Channel::getMembers(void) {
-    return (_members);
+	return (_members);
 }
 
 bool    Channel::addInvite(int memberFd) {
-    return (_inviteList.insert(memberFd).second);
+	return (_inviteList.insert(memberFd).second);
 }
 
 bool    Channel::removeInvite(int memberFd) {
-    return (_inviteList.erase(memberFd));
+	return (_inviteList.erase(memberFd));
 }
 
 bool    Channel::isInvited(int memberFd) {
-    return (_inviteList.find(memberFd) != _inviteList.end());
+	return (_inviteList.find(memberFd) != _inviteList.end());
 }
 
-bool    Channel::isMode(const std::string& mode) const {
-    return (_chanModeList.find(mode) != _chanModeList.end());
+const Channel::s_Topic&   Channel::getTopicStruct(void) const {
+	return (_topic);
 }
 
 const std::string   Channel::getTopic(void) const {
-    return (t_Topic.topic);
+	return (_topic.topic);
 }
 
 const std::string   Channel::getTopicAuthor(void) const {
-    return (t_Topic.topicAuthor);
+	return (_topic.topicAuthor);
 }
 
 void    Channel::setTopic(const std::string& topic) {
-    if (topic.empty()) {
-        t_Topic.topic = "";
-    }
-    else {
-        t_Topic.topic = topic;
-    }
+	if (topic.empty()) {
+		_topic.topic = "";
+	}
+	else {
+		_topic.topic = topic;
+	}
 }
 
 void    Channel::setTopicAuthor(const std::string& author) {
-    t_Topic.topicAuthor = author;
+	_topic.topicAuthor = author;
 }
 
 void    Channel::setTimestamp(void) {
-    t_Topic.time = std::time(0);
+	_topic.time = std::time(0);
 }
 
 std::time_t    Channel::getTimestamp(void) const {
-    return (t_Topic.time);
+	return (_topic.time);
 }
 
-// void    Channel::notifyQuit(int memberFd, const std::string& msg) const {
-//     std::map<int, MemberState>::const_iterator  it = _members.begin();
-//     for (; it != _members.end(); ++it) {
-//         if (it->first == memberFd) {
-//             continue;
-//         }
-        
-//     }
-// }
+bool    Channel::isMode(const std::string& mode) const {
+	if (mode == "i") {
+		return (_inviteOnly);
+	}
+	if (mode == "t") {
+		return (_topicRestricted);
+	}
+	if (mode == "k") {
+		return (_keyEnabled);
+	}
+	if (mode == "l") {
+		return (_limitEnabled);
+	}
+	return (false);
+}
+
+void	Channel::setInviteOnly(bool inviteOnly) {
+	_inviteOnly = inviteOnly;
+}
+
+void	Channel::setTopiRestricted(bool topicRestricted) {
+	_topicRestricted = topicRestricted;
+}
+
+void	Channel::setKey(const std::string& key) {
+	_key = key;
+}
+
+const std::string&	Channel::getKey(void) const{
+	return (_key);
+}
+
+void	Channel::unsetKey(void) {
+	_key.clear();
+}
+
+void    Channel::setLimit(std::size_t limit) {
+	_userLimit = limit;
+	_limitEnabled = true;
+}
+
+void    Channel::unsetLimit(void) {
+	_limitEnabled = false;
+}
+
+std::size_t    Channel::getLimitChannel() {
+	return (_userLimit);
+}
+
+std::string	Channel::buildModeString(void) const {
+	std::string modeString = "";
+
+	if (_inviteOnly) {
+		modeString += "i";
+	}
+	if (_topicRestricted) {
+		modeString += "t";
+	}
+	if (_keyEnabled) {
+		modeString += "k";
+	}
+	if (_limitEnabled) {
+		modeString += "l";
+	}
+	if (!modeString.empty()) {
+		modeString = "+" + modeString;
+	}
+	return (modeString);
+}
+
+void	Channel::handleSingleMode(const char mode, bool add, const std::string& param) {
+	switch (mode) {
+		case 'i' : 
+			_inviteOnly = add;
+			break;
+		case 't' : 
+			_topicRestricted = add;
+		break;
+		case 'l' : 
+			_limitEnabled = add;
+			if (add && !param.empty()) {
+				std::istringstream iss(param);
+				std::size_t limit;
+				if (iss >> limit) {
+					_userLimit = limit;
+				}
+			}
+		break;
+		case 'k' : 
+			_keyEnabled = add;
+			if (add && !param.empty()) {
+				_key = param;
+			}
+		break;
+		default:
+		break;
+	}
+}
+
+bool	Channel::updateMemberState(int memberFd, bool isOp) {
+	std::map<int, MemberState>::iterator member = _members.find(memberFd);
+	if (member == _members.end()) {
+		return (false);
+	}
+	member->second.isChanOp = isOp;
+	return (true);
+}
+

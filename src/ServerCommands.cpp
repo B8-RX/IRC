@@ -52,6 +52,9 @@ bool	Server::_dispatchCommand(int clientFd, s_Line& sLine) {
 		else if (sLine.command == "TOPIC") {
 			return (_handleTopic(*pCli, sLine));
 		}
+		else if (sLine.command == "MODE") {
+			return (_handleMode(*pCli, sLine));
+		}
 		else {
 			_sendErrUnknownCommand(*pCli, clientNick, sLine, sLine.command);
 			return (false);
@@ -182,11 +185,12 @@ bool	Server::_handleUser(Client& cli, const s_Line& sline) {
 }
 
 
-//? Command:  
-//? Parameters:  
-//? ===> 
-//? message <=== 
-//? message <=== 
+//? Command:  JOIN
+//? Parameters:  <channel>{,<channel>} [<key>{,<key>}]
+//? ===> JOIN #foobar 	; join channel #foobar.
+//? ===> JOIN #foo,#bar fubar,foobar	; join channel #foo using key "fubar". and channel #bar using key "foobar".	
+//? message <=== :WiZ JOIN #Twilight_zone        ; WiZ is joining the channel #Twilight_zone
+//? message <===  :dan-!d@localhost JOIN #test    ; dan- is joining the channel #test
 bool	Server::_handleJoin(Client& cli, const s_Line& sline) {
 	
 	// validation 
@@ -201,6 +205,10 @@ bool	Server::_handleJoin(Client& cli, const s_Line& sline) {
 		return (false);
 	}
 	std::string chanParam = sline.params[0];
+	std::string keyParam;
+	if (sline.params.size() > 1) {
+		keyParam = sline.params[1];
+	}
 	while (!chanParam.empty()) {
 		std::size_t commaPos = chanParam.find(',');
 		std::string	channelName;
@@ -233,19 +241,49 @@ bool	Server::_handleJoin(Client& cli, const s_Line& sline) {
 			std::cerr << "channel [" << pChan->getName() << "]: Client [" << cli.getNickname() << "] is already member of the channel!" << "\n";
 			return (false);
 		}
+		// check if mode invite-only is enabled and if true check if the client is invited
+		//!	ERR_INVITEONLYCHAN (473)
+		if (pChan->isMode("i") && !pChan->isInvited(cli.fd)) {
+			_sendErrInviteOnlyChan(cli, clientNick, sline, channelName);
+			return (false);
+		}
+		// check if mode client limit is enabled and if true check if the limit is reached
+		//!	ERR_CHANNELISFULL (471) 
+		if (pChan->isMode("l") && pChan->memberCount() >= pChan->getLimitChannel()) {
+			_sendErrChanIsFull(cli, clientNick, sline, channelName);
+			return (false);
+		}
+		// check if mode key is enabled and if the key is incorrect or not supplied
+		//!	ERR_BADCHANNELKEY (475)
+		if (pChan->isMode("k")) {
+			std::size_t commaPos = keyParam.find(',');
+			std::string	keyName;
+			if (commaPos == std::string::npos)
+			{
+				keyName = keyParam;
+				keyParam.clear();
+			}
+			else {
+				keyName = keyParam.substr(0, commaPos);
+				keyParam.erase(0, commaPos + 1);
+			}
+			if (keyName != pChan->getKey()) {
+			   _sendErrBadChannelKey(cli, clientNick, sline, channelName);
+			   return (false);
+			}
+		}
+
 		if (!pChan->addMember(cli.fd, isFirstMember)) {
-			std::cerr << "channel [" << pChan->getName() << "]: Error occured. Cannot add member [" << cli.getNickname() << "] to the channel!\n";
+			std::string message = "Cannot add member " + cli.getNickname() + " to the channel " + pChan->getName();
+			_printLogServer("DEBUG", cli, sline, message);
 			return (false);
 		}
 		if (!cli.isMemberChan(channelName)) {
 			cli.addSubscriptionChan(channelName);
 		}
+
 		_printLogServer("INFO", cli, sline, channelName);
 		_sendRplTopic(cli, clientNick, sline, pChan->getTopic()); 
-		//TODO send messages see JOIN part in the modern IRC documentation
-		// _printChannel(chan); //! define a DEBUG macro, when true true it will trigger this logs
-		//!TODO handle multiple keys (sline.params[1]) separated by colon see documentation of JOIN cmd.
-			
 	}
 	return (true);
 }
@@ -283,23 +321,30 @@ bool	Server::_handlePart(Client& cli, const s_Line& sline) {
 		Channel*	pChan = getChannel(channelName);
 		if (pChan != NULL) {
 			if (pChan->isMember(cli.fd)) {
-				const std::map<int, Channel::MemberState>&	chanMembers = pChan->getMembers();
-				std::map<int, Channel::MemberState>::const_iterator membersIt = chanMembers.begin();
+				std::map<int, Channel::MemberState>&	chanMembers = pChan->getMembers();
+				std::map<int, Channel::MemberState>::iterator membersIt = chanMembers.begin();
+				bool	foundChanOp = false;
 				for (; membersIt != chanMembers.end(); ++membersIt) {
 					std::string prefix = ":" + clientNick + "!" + cli.getUsername() + "@" + cli.ipAddr;
 					std::string message = CYAN + prefix + " " + sline.command + " " + channelName + std::string(RESET);
 					if (!reason.empty()) {
 						message += " :"  + std::string(RESET) + reason;
 					}
+					if (!foundChanOp && membersIt->first != cli.fd && membersIt->second.isChanOp == true) {
+						foundChanOp = true;
+					}
 					_sendToClient(membersIt->first, message);
 				}
 				pChan->removeMember(cli.fd);
 				cli.removeSubscribedChannel(channelName);
+				if (!foundChanOp && chanMembers.begin() != chanMembers.end()) {
+					pChan->updateMemberState(chanMembers.begin()->first, true);
+				}
 				_printLogServer("INFO", cli, sline, channelName);
 				if (pChan->empty()) {
 					_channelList.erase(_channelList.find(channelName));
 					std::cout << "channel [" << channelName << "] have 0 member. Channel have been deleted successfully.\n";
-				}
+				} 
 			}
 			else {
 				_sendErrNotOnChannel(cli, clientNick, sline, channelName);
@@ -349,11 +394,18 @@ bool	Server::_handleQuit(Client& cli, const s_Line& sline) {
 		// with a unique key container std::set<int>,
 		//  to only send the msg once even if the member shares > 1 channel with the quitting member
 		ChannelMembersMap::const_iterator it = members.begin();
+		bool	foundChanOp = false;
 		for (; it != members.end(); ++it) {
 			if (it->first == cli.fd) {
 				continue;
 			}
+			if (!foundChanOp && it->second.isChanOp) {
+				foundChanOp = true;
+			}
 			listMembersToNotify.insert(it->first);
+		}
+		if (!foundChanOp && members.begin() != members.end()) {
+			channel.updateMemberState(members.begin()->first, true);
 		}
 	}
 	// send QUIT notification to the members on the list of the members to notify
@@ -387,7 +439,7 @@ bool	Server::_handlePing(Client& cli, const s_Line& sline) {
 		_sendErrNeedMoreParams(cli, clientNick, sline, sline.command);
 		return (false);
 	}
-	std::string message =  std::string(CYAN) + ":" + _serverName + " PONG " + _serverName + " " + sline.params[0] + std::string(RESET);
+	std::string message = ":" + _serverName + " PONG " + _serverName + " " + sline.params[0];
 	_sendToClient(cli.fd, message);
 	_printLogServer("INFO", cli, sline, sline.command);
 	return (true);
@@ -435,7 +487,7 @@ bool	Server::_handlePrivmsg(Client& cli, const s_Line& sline) {
 		
 		// construct the full message
 
-		std::string message = CYAN + prefix + " PRIVMSG " + targetName + " :" + RESET + privMsg + std::string(RESET);
+		std::string message = prefix + " PRIVMSG " + targetName + " :" + privMsg;
 		
 		// check if is target is a channel or a user
 		if (targetName[0] != '#') {
@@ -697,7 +749,7 @@ bool	Server::_handleTopic(Client& cli, s_Line& sline) {
 		}
 		else {
 			_sendRplTopic(cli, clientNick, sline, pChan->getTopic());
-			_sendRplWhoTime(cli, clientNick, sline, pChan->t_Topic);
+			_sendRplWhoTime(cli, clientNick, sline, pChan->getTopicStruct());
 		}
 		_printLogServer("INFO", cli, sline, channelName);
 	}
@@ -722,6 +774,146 @@ bool	Server::_handleTopic(Client& cli, s_Line& sline) {
 		for (; membersIt != members.end(); ++membersIt) {
 			_sendToClient(membersIt->first, message);
 		}  
+	}
+	return (true);
+}
+
+//? Command:  MODE
+//? Parameters:  <target> [<modestring> [<mode arguments>...]]
+//? ===> MODE #chan1 +i			; Setting/Remove the "invite-only" mode on channel #chan1.
+//? ===> MODE #chan1			; Getting modes for a channel (and channel creation time):
+//? message <=== :dan!~h@localhost MODE #foobar -l+i  ; dan removed the client limit from, and set the #foobar channel to invite-only.
+//? message <=== :irc.example.com MODE #foobar +o bunny		; The irc.example.com server gave channel operator privileges to bunny on #foobar.
+bool	Server::_handleMode(Client& cli, s_Line& sline) {
+	std::string	clientNick = cli.getNickname();
+	if (clientNick.empty()) {
+		clientNick = "*";
+	}
+	
+	// check if param minimum is 1
+	//!	ERR_NEEDMOREPARAMS (461) 
+	if (sline.params.size() < 1) {
+		_sendErrNeedMoreParams(cli, clientNick, sline, sline.command);
+		return (false);
+	}
+	
+	std::string	channelName = sline.params[0];
+	// check if channel exist
+	//!	ERR_NOSUCHCHANNEL (403)
+	Channel*	pChan = getChannel(channelName);
+	if (pChan == NULL) {
+		_sendErrNoSuchChannel(cli, clientNick, sline, channelName);
+		return (false);
+	}
+
+	std::string	modestring;
+	if (sline.params.size() > 1) {
+		modestring = sline.params[1];
+	}
+	// check if <modestring> (sline.params[1]) is not given
+	//!	RPL_CHANNELMODEIS (324)
+	//!	RPL_CREATIONTIME (329)
+	if (modestring.empty()) {
+		modestring = pChan->buildModeString();
+		if (pChan->isMode("k") && pChan->isChanOp(cli.fd)) {
+			modestring += (" " + pChan->getKey());
+		}
+		if (pChan->isMode("l")) {
+			modestring += (" " + pChan->getLimitChannel());
+		}
+		_sendRplChannelModeIs(cli, clientNick, sline, modestring);
+		_sendRplCreationTime(cli, clientNick, sline, pChan->getCreationTime());
+	}
+	else {
+		// check the user have appropriate privileges to change modes given
+		//!	ERR_CHANOPRIVSNEEDED (482) 
+		if (!pChan->isChanOp(cli.fd)) {
+			_sendErrChaNoPrivsNeeded(cli, clientNick, sline, channelName);
+			return (false);
+		}
+		bool		add = false;
+		bool		minus = false;
+		std::size_t	paramIndex = 2;
+		std::string paramsFull;
+		std::string paramsKey;
+		for (std::size_t i = 0; i < modestring.size(); ++i) {
+			
+			if (modestring[i] == '+') {
+				add = true;
+				minus = false;
+			}
+			else if (modestring[i] == '-') {
+				add = false;
+				minus = true;
+			}
+			else {
+				std::string	param;
+				if (sline.params.size() >= (paramIndex + 1)) {
+					param = sline.params[paramIndex];
+				}
+				if (modestring[i] == 'o') {
+					Client* user = getClientByNick(param);
+					if (user == NULL) {
+						paramIndex++;
+						continue;
+					}
+					else {
+						pChan->updateMemberState(user->fd, add);
+					}
+				}
+				else {
+					pChan->handleSingleMode(modestring[i], add, param);	
+				}
+				if (modestring[i] == 'k' || modestring[i] == 'l' || modestring[i] == 'o') {
+					if (modestring[i] != 'k') {
+						if (paramsFull.empty()) {
+							paramsFull += param;
+						}
+						else {
+							paramsFull += (" " + param);
+						}
+					}
+					else {
+						paramsKey = param;
+					}
+					paramIndex++;
+				}
+			}
+		}
+		
+		// send to members the changes
+		std::string prefix = ":" + cli.getNickname() + "!" + cli.getUsername() + "@" + cli.ipAddr;
+		std::string parity = (add ? "+" : minus ? "-" : "");
+		std::string message = prefix + " MODE " + channelName + " " + modestring + (paramsFull.empty() ? "" : " ") + paramsFull;
+		
+		const std::map<int, Channel::MemberState>& members = pChan->getMembers();
+		std::map<int, Channel::MemberState>::const_iterator membIt = members.begin();
+
+		std::string messageChanOp = message += (" " + paramsKey);
+		for (; membIt != members.end(); ++membIt) {
+			if (membIt->first != cli.fd) {
+				if (membIt->second.isChanOp) {
+					_sendToClient(membIt->first, messageChanOp);
+				}
+				else {
+					_sendToClient(membIt->first, message);
+				}
+			}
+		}
+		
+		// notify the issuer
+		prefix = ":" + _serverName;
+		parity = (add ? "+" : minus ? "-" : "");
+		message = prefix + " MODE " + channelName + " " + modestring  + (paramsFull.empty() ? "" : " ") + paramsFull;
+		if (!paramsKey.empty()) {
+			message += (" " + paramsKey);
+		}
+		_sendToClient(cli.fd, message);
+		message =  modestring + (paramsFull.empty() ? "" : " ") + paramsFull;
+		if (!paramsKey.empty()) {
+		message += (" " + paramsKey);
+		}
+		_printLogServer("INFO", cli, sline, message);
 	}
 	return (true);
 }

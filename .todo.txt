@@ -14,12 +14,13 @@ Pas obligatoire, mais ça peut éviter un énorme Server.cpp.
 
 - INVITE DONE
 
-- TOPIC
+- TOPIC DONE
 
-- MODE
+- MODE 
+	FIX: in the notification message, dont send the password to the non operators when +k is set
+	
 
 //////////////////
-- when the op channel quit/part the server/channel do i nominate another chanOp ? 
 
 
 
