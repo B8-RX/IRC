@@ -59,16 +59,20 @@
 
 
 		// channel modes
+		struct	s_mode {
+			std::string	param;
+			char mode;
+			bool add;
+		};
 		bool						isMode(const std::string& mode) const;
 		void						setInviteOnly(bool);
-		void						setTopiRestricted(bool);
+		void						setTopicRestricted(bool);
 		void						setKey(const std::string& key);
 		const std::string&			getKey(void) const;
 		void						unsetKey(void);
 		void						setLimit(std::size_t limit);
 		void						unsetLimit(void);
 		std::string					buildModeString(void) const;
-		void						handleSingleMode(const char mode, bool add, const std::string& param);
 	
 		private:
 		std::string                 _name;

@@ -260,7 +260,6 @@ void	Server::_sendErrUnknownCommand(Client& cli, const std::string& nick, const 
 	_sendToClient(cli.fd, line);
 }
 
-
 void	Server::_sendErrUnregistered(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const {
 	(void)placeholder;
 	std::string	numeric = " 451 ";
@@ -291,6 +290,7 @@ void	Server::_sendErrUserOnChannel(Client& cli, const std::string& nick, const s
 	_printLogServer("DEBUG", cli, sline, line);
 	_sendToClient(cli.fd, line);
 }
+
 
 void	Server::_sendErrNoSuchChannel(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const {
 	std::string	numeric = " 403 ";
@@ -426,6 +426,21 @@ void	Server::_sendRplCreationTime(Client& cli, const std::string& nick, const s_
 	std::ostringstream oss;
 	oss << creationTime;
 	std::string line = ":" + _serverName + numeric + " " + nick + " " + channelName + " " + oss.str();
+	_printLogServer("DEBUG", cli, sline, line);
+	_sendToClient(cli.fd, line);
+}
+
+void	Server::_sendErrUnknownMode(Client& cli, const std::string& nick, const s_Line& sline, const char mode) const {
+	std::string	numeric = " 472 ";
+	std::string line = ":" + _serverName + numeric + nick + " " + mode + " :is unknown mode char to me";
+	_printLogServer("DEBUG", cli, sline, line);
+	_sendToClient(cli.fd, line);
+}
+
+void	Server::_sendErrUserNotInChannel(Client& cli, const std::string& nick, const s_Line& sline, const std::string& userName) const {
+	std::string	numeric = " 441 ";
+	std::string chanName = sline.params[0];
+	std::string line = ":" + _serverName + numeric + nick + " " + userName + " " + chanName + " :They aren't on that channel"; 
 	_printLogServer("DEBUG", cli, sline, line);
 	_sendToClient(cli.fd, line);
 }

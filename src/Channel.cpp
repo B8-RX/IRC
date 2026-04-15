@@ -1,5 +1,4 @@
 #include "Channel.hpp"
-#include <sstream>
 
 Channel::Channel(void) : _name(""), _creationTime(std::time(0)), _inviteOnly(false), _topicRestricted(false), _limitEnabled(false), _keyEnabled(false) {}
 Channel::Channel(const std::string& name) : _name(name), _creationTime(std::time(0)), _inviteOnly(false), _topicRestricted(false), _limitEnabled(false), _keyEnabled(false) {}
@@ -119,12 +118,13 @@ void	Channel::setInviteOnly(bool inviteOnly) {
 	_inviteOnly = inviteOnly;
 }
 
-void	Channel::setTopiRestricted(bool topicRestricted) {
+void	Channel::setTopicRestricted(bool topicRestricted) {
 	_topicRestricted = topicRestricted;
 }
 
 void	Channel::setKey(const std::string& key) {
 	_key = key;
+	_keyEnabled = true;
 }
 
 const std::string&	Channel::getKey(void) const{
@@ -133,6 +133,7 @@ const std::string&	Channel::getKey(void) const{
 
 void	Channel::unsetKey(void) {
 	_key.clear();
+	_keyEnabled = false;
 }
 
 void    Channel::setLimit(std::size_t limit) {
@@ -167,35 +168,6 @@ std::string	Channel::buildModeString(void) const {
 		modeString = "+" + modeString;
 	}
 	return (modeString);
-}
-
-void	Channel::handleSingleMode(const char mode, bool add, const std::string& param) {
-	switch (mode) {
-		case 'i' : 
-			_inviteOnly = add;
-			break;
-		case 't' : 
-			_topicRestricted = add;
-		break;
-		case 'l' : 
-			_limitEnabled = add;
-			if (add && !param.empty()) {
-				std::istringstream iss(param);
-				std::size_t limit;
-				if (iss >> limit) {
-					_userLimit = limit;
-				}
-			}
-		break;
-		case 'k' : 
-			_keyEnabled = add;
-			if (add && !param.empty()) {
-				_key = param;
-			}
-		break;
-		default:
-		break;
-	}
 }
 
 bool	Channel::updateMemberState(int memberFd, bool isOp) {

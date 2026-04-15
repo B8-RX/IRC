@@ -12,6 +12,8 @@
 #include "Channel.hpp"
 #include <map>
 #include <utility>
+#include <sstream>
+
 
 #define RED "\033[31m"
 #define GREEN "\033[32m"
@@ -30,11 +32,11 @@ class Server {
 		void	init(void);
 		void	run(void);
 		
-		std::size_t									clientCount(void) const;
-		std::size_t									channelCount(void) const;
-		Client*										getClient(int clienFd);
-		Client*										getClientByNick(const std::string& nick);
-		Channel*									getChannel(const std::string& name);
+		std::size_t						clientCount(void) const;
+		std::size_t						channelCount(void) const;
+		Client*							getClient(int clienFd);
+		Client*							getClientByNick(const std::string& nick);
+		Channel*						getChannel(const std::string& name);
 		struct s_Line {
 			std::string					raw;
 			std::string					prefix;
@@ -82,9 +84,11 @@ class Server {
 		void							_sendErrCannotSendToChan(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
 		void							_sendErrChaNoPrivsNeeded(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
 		void							_sendErrUserOnChannel(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
+		void							_sendErrUserNotInChannel(Client& cli, const std::string& nick, const s_Line& sline, const std::string& userName) const;
 		void							_sendErrChanIsFull(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
 		void							_sendErrBadChannelKey(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
 		void							_sendErrInviteOnlyChan(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
+		void							_sendErrUnknownMode(Client& cli, const std::string& nick, const s_Line& sline, const char mode) const;
 		
 		
 		void							_sendRplInviteList(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const;
@@ -123,6 +127,7 @@ class Server {
 		bool							_handleInvite(Client& cli, s_Line& sline);
 		bool							_handleTopic(Client& cli, s_Line& sline);
 		bool							_handleMode(Client& cli, s_Line& sline);
+		int								_handleSingleMode(Channel::s_mode& smode, Channel& chan, Client& cli, s_Line& sline);
 
 		// state update	
 		bool							_updateRegisteredState(int clientFd);
