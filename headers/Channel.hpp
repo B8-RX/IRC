@@ -5,6 +5,7 @@
 #include <string>
 #include <map>
 #include <set>
+#include <vector>
 #include <cstddef>
 #include <ctime>
 
@@ -60,9 +61,12 @@
 
 		// channel modes
 		struct	s_mode {
-			std::string	param;
-			char mode;
-			bool add;
+			std::string					param;
+			std::vector<std::string>	vParam;
+			std::vector<char>				vMode;
+			char 						mode;
+			bool						add;
+			bool						minus;
 		};
 		bool						isMode(const std::string& mode) const;
 		void						setInviteOnly(bool);

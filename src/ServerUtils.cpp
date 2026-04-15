@@ -444,3 +444,13 @@ void	Server::_sendErrUserNotInChannel(Client& cli, const std::string& nick, cons
 	_printLogServer("DEBUG", cli, sline, line);
 	_sendToClient(cli.fd, line);
 }
+
+bool	Server::_isUnique(std::vector<char>& vMode, char mode) const {
+	std::vector<char>::iterator	vModeIt = vMode.begin();
+	for (; vModeIt != vMode.end(); ++vModeIt) {
+		if (*vModeIt == mode) {
+			break;
+		}
+	}
+	return (vModeIt == vMode.end());
+}

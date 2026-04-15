@@ -142,6 +142,7 @@ class Server {
 		bool    						_isValidNick(const std::string& nick) const;
 		bool							_isUsedNick(std::map<int, Client>& ClientsList, const std::string& nick, int clientFd) const;
 		bool							_isValidChannelName(const std::string& name) const;
+		bool							_isUnique(std::vector<char>& vMode, char mode) const;
 	public:
 		static void	sighandler(int signum);
 		class	ErrorException : public std::exception {

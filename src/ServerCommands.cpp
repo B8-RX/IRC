@@ -805,11 +805,20 @@ bool	Server::_handleMode(Client& cli, s_Line& sline) {
 		_sendErrNoSuchChannel(cli, clientNick, sline, channelName);
 		return (false);
 	}
+
+	// check if the issuer is on the channel
+	//!  ERR_NOTONCHANNEL (442) 
+	if (!pChan->isMember(cli.fd)) {
+		_sendErrNotOnChannel(cli, clientNick, sline, channelName);
+		return (false);
+	}
+
 	std::string	modestring;
 	if (sline.params.size() > 1) {
 		modestring = sline.params[1];
 	}
-
+	std::size_t paramKeyPos = std::string::npos;
+	std::size_t	signCount = 0;
 	// check if <modestring> (sline.params[1]) is not given
 	//!	RPL_CHANNELMODEIS (324)
 	//!	RPL_CREATIONTIME (329)
@@ -831,58 +840,64 @@ bool	Server::_handleMode(Client& cli, s_Line& sline) {
 			_sendErrChaNoPrivsNeeded(cli, clientNick, sline, channelName);
 			return (false);
 		}
-		bool		add = false;
-		std::size_t	paramIndex = 2;
-		std::string paramsFull;
-		std::string paramsKey;
 		Channel::s_mode	smode;
+		std::size_t	paramIndex = 2;
+		smode.add = false;
+		smode.minus = false;
 		for (std::size_t i = 0; i < modestring.size(); ++i) {
 			smode.mode = modestring[i];
 			if (smode.mode == '+') {
 				smode.add = true;
+				smode.minus = false;
+				signCount++;
 			}
 			else if (smode.mode == '-') {
 				smode.add = false;
+				smode.minus = true;
+				signCount++;
 			}
 			else {
+				smode.param.clear();
 				if (sline.params.size() >= (paramIndex + 1)) {
 					smode.param = sline.params[paramIndex];
 				}
 				paramIndex += _handleSingleMode(smode, *pChan, cli, sline);	
-				if (add && (smode.mode == 'k' || smode.mode == 'l' || smode.mode == 'o')) {
-					if (modestring[i] != 'k') {
-						if (paramsFull.empty()) {
-							paramsFull += smode.param;
-						}
-						else {
-							paramsFull += (" " + smode.param);
-						}
-					}
-					else {
-						paramsKey = smode.param;
-					}
-					paramIndex++;
+				if (smode.add && smode.mode == 'k') {
+						paramKeyPos = i - signCount;
 				}
 			}
 		}
 		
 		// send to members the changes
+		std::string paramsFull;
+		std::string paramsFullChanOp;
+		for (std::size_t i = 0; i < smode.vParam.size(); ++i) {
+			if (paramKeyPos != std::string::npos && i == paramKeyPos) {
+					paramsFullChanOp += (" " + smode.vParam[i]);
+				continue;
+			}
+			paramsFull += (" " + smode.vParam[i]);
+			paramsFullChanOp += (" " + smode.vParam[i]);
+		}
+		modestring.clear();
+		for (std::size_t i = 0; i < smode.vMode.size(); ++i) {
+			modestring += smode.vMode[i];
+		}
 		std::string prefix = ":" + cli.getNickname() + "!" + cli.getUsername() + "@" + cli.ipAddr;
-		std::string message = prefix + " MODE " + channelName + " " + modestring + (paramsFull.empty() ? "" : " ") + paramsFull;
+		std::string message = prefix + " MODE " + channelName + " " + modestring;
 		
 		const std::map<int, Channel::MemberState>& members = pChan->getMembers();
 		std::map<int, Channel::MemberState>::const_iterator membIt = members.begin();
 
-		std::string messageChanOp = message += (" " + paramsKey);
 		for (; membIt != members.end(); ++membIt) {
 			if (membIt->second.isChanOp) {
-				_sendToClient(membIt->first, messageChanOp);
+				_sendToClient(membIt->first, message + paramsFullChanOp);
 			}
 			else {
-				_sendToClient(membIt->first, message);
+				_sendToClient(membIt->first, message + paramsFull);
 			}
 		}
-		std::string messageServerLog = paramsFull + " " + paramsKey;
+		std::string messageServerLog = modestring + paramsFullChanOp;
 		_printLogServer("INFO", cli, sline, messageServerLog);
 	}
 	return (true);
@@ -904,6 +919,14 @@ int	Server::_handleSingleMode(Channel::s_mode& smode, Channel& chan, Client& cli
 				}
 				else {
 					chan.updateMemberState(user->fd, smode.add);
+					if (smode.add && _isUnique(smode.vMode, '+')) {
+						smode.vMode.push_back('+');
+					}
+					else if (smode.minus && _isUnique(smode.vMode, '-')) {
+						smode.vMode.push_back('-');
+					}
+					smode.vParam.push_back(smode.param);
+					smode.vMode.push_back(smode.mode);
 				}
 			}
 			ret = 1;
@@ -911,9 +934,23 @@ int	Server::_handleSingleMode(Channel::s_mode& smode, Channel& chan, Client& cli
 		break;
 		case 'i' : 
 			chan.setInviteOnly(smode.add);
+			if (smode.add && _isUnique(smode.vMode, '+')) {
+				smode.vMode.push_back('+');
+			}
+			else if (smode.minus && _isUnique(smode.vMode, '-')) {
+				smode.vMode.push_back('-');
+			}
+			smode.vMode.push_back(smode.mode);
 			break;
 		case 't' : 
 			chan.setTopicRestricted(smode.add);
+			if (smode.add && _isUnique(smode.vMode, '+')) {
+				smode.vMode.push_back('+');
+			}
+			else if (smode.minus && _isUnique(smode.vMode, '-')) {
+				smode.vMode.push_back('-');
+			}
+			smode.vMode.push_back(smode.mode);
 		break;
 		case 'l' : 
 			if (smode.add && !smode.param.empty()) {
@@ -921,21 +958,36 @@ int	Server::_handleSingleMode(Channel::s_mode& smode, Channel& chan, Client& cli
 				std::size_t limit;
 				if (iss >> limit && limit > 0) {
 					chan.setLimit(limit);
+					if (smode.add && _isUnique(smode.vMode, '+')) {
+						smode.vMode.push_back('+');
+					}
+					else if (smode.minus && _isUnique(smode.vMode, '-')) {
+						smode.vMode.push_back('-');
+					}
 				}
 				ret = 1;
 			}
-			else {
+			else if (smode.minus && _isUnique(smode.vMode, '-')) {
+				smode.vMode.push_back('-');
 				chan.unsetLimit();
 			}
+			smode.vParam.push_back(smode.param);
+			smode.vMode.push_back(smode.mode);				
 		break;
 		case 'k' : 
 			if (smode.add && !smode.param.empty()) {
 				chan.setKey(smode.param);
+				if (smode.add && _isUnique(smode.vMode, '+')) {
+					smode.vMode.push_back('+');
+				}
 				ret = 1;
 			}
-			else {
+			else if (smode.minus && _isUnique(smode.vMode, '-')) {
+				smode.vMode.push_back('-');
 				chan.unsetKey();
 			}
+			smode.vParam.push_back(smode.param);
+			smode.vMode.push_back(smode.mode);
 		break;
 		default:
 			_sendErrUnknownMode(cli, cli.getNickname(), sline, smode.mode);
