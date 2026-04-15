@@ -1,20 +1,9 @@
 
 TODO 15/04/2026
 
-NICK broadcast
-RPL_WELCOME
-JOIN avec keys multiples
+- JOIN avec keys multiples
+- mettre des limites pour la taille des username nickname topicname channelName...
 
-Format :
-:oldNick!user@host NICK :newNick
-Le <source> doit être l’ancien nickname
-Gérer JOIN avec clés multiples
-
-Envoyer les messages de bienvenue à la connexion
-Implémenter les RPL_WELCOME et autres RPL_* requis après registration complète (PASS/NICK/USER)
-Vérifier l’ordre et le format des replies
-Notifier les changements de nickname
-Broadcast un NICK à tous les clients partageant un channel avec l’émetteur
 
 Supporter :
 

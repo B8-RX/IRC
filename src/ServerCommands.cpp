@@ -68,11 +68,10 @@ bool	Server::_dispatchCommand(int clientFd, s_Line& sLine) {
 }
 
 
-//? Command:  
-//? Parameters:  
-//? ===> 
-//? message <=== 
-//? message <=== 
+//? Command:  PASS
+//? Parameters:  <password>
+//? ===> PASS secretpasswordhere
+
 bool	Server::_handlePass(Client& cli, const s_Line& sline) {
 
 	// validation 
@@ -102,17 +101,25 @@ bool	Server::_handlePass(Client& cli, const s_Line& sline) {
 			return (false);
 		}
 	}
-	_updateRegisteredState(cli.fd);
 	_printLogServer("INFO", cli, sline, sline.command);
+	if (!cli.getRegirstered()) {
+		if (_updateRegisteredState(cli.fd)) {
+			_sendRplWelcome(cli);
+			_sendRplYourHost(cli);
+			_sendRplCreated(cli);
+			_sendRplMyInfo(cli);
+			_printLogServer("INFO", cli, sline, "registered");
+		}
+	}
 	return (true);
 }
 
 
-//? Command:  
-//? Parameters:  
-//? ===> 
-//? message <=== 
-//? message <=== 
+//? Command:  NICK
+//? Parameters:  <nickname>
+//? ===> NICK Wiz	; Requesting the new nick "Wiz".
+//? message <=== :dan-!d@localhost NICK Mamoped		; dan- changed his nickname to Mamoped.
+//? message <=== :WiZ NICK Kilroy	; WiZ changed his nickname to Kilroy.	
 bool	Server::_handleNick(Client& cli, const s_Line& sline) {
 	
 	// validation 
@@ -135,28 +142,43 @@ bool	Server::_handleNick(Client& cli, const s_Line& sline) {
 		_sendErrNickNameInUse(cli, clientNick, sline, targetNick);
 		return (false); 
 	}		
-
-	// execution
+	
 	if (cli.hasNick) {
+		// send NICK message to all the members that shares a channel with the issuer
 		cli.setOldNickname(cli.getNickname());
+		
+		std::string					oldNick = cli.getOldNickname().empty() ? "*" : cli.getOldNickname();
+		std::string					newNick = sline.params[0].empty() ? "*" : sline.params[0];
+		std::string					username = cli.getUsername().empty() ? "*" : cli.getUsername(); 
+		std::string					prefix = ":" + oldNick + "!" + username + "@" + cli.ipAddr;
+		std::string					message = prefix + " NICK " + newNick;
+		
+		std::vector<std::string>	cliChannels = cli.getSubscribedChannels();
+		
+		_notifyChanMembers(cliChannels, cli.fd, message);
 	}
-	// TODO: SERVER MUST  SEND TO CLIENTS ACKNOLEDGMENT TO SAY THEIR NICK COMMAND WAS SUCCESSFUL, AND TELL OTHER CLIENTS ABOUT THE CHANGE OF NICKNAME. <source> of the message will be the old nickname 
 
 	cli.setNickname(sline.params[0]);
 	cli.hasNick = true;
 
 	
-	_updateRegisteredState(cli.fd);
 	_printLogServer("INFO", cli, sline, sline.command);
+	if (!cli.getRegirstered()) {
+		if (_updateRegisteredState(cli.fd)) {
+			_sendRplWelcome(cli);
+			_sendRplYourHost(cli);
+			_sendRplCreated(cli);
+			_sendRplMyInfo(cli);
+			_printLogServer("INFO", cli, sline, "registered");
+		}
+	}
 	return (true);
 }
 
 
-//? Command:  
-//? Parameters:  
-//? ===> 
-//? message <=== 
-//? message <=== 
+//? Command: USER
+//? Parameters:  <username> 0 * <realname>
+//? ===> USER guest 0 * :Ronnie Reagan ; User gets registered with username "~guest" and real name "Ronnie Reagan"
 bool	Server::_handleUser(Client& cli, const s_Line& sline) {
 
 	// validation 
@@ -176,11 +198,19 @@ bool	Server::_handleUser(Client& cli, const s_Line& sline) {
 	
 	// execution
 
-	cli.setUsername(sline.params[0]);
+	cli.setUsername(( "~" + sline.params[0]));
 	cli.setRealname(sline.params[3]);
 	cli.hasUser = true;
-	_updateRegisteredState(cli.fd);
 	_printLogServer("INFO", cli, sline, sline.command);
+	if (!cli.getRegirstered()) {
+		if (_updateRegisteredState(cli.fd)) {
+			_sendRplWelcome(cli);
+			_sendRplYourHost(cli);
+			_sendRplCreated(cli);
+			_sendRplMyInfo(cli);
+			_printLogServer("INFO", cli, sline, "registered");
+		}
+	}
 	return (true);
 }
 
@@ -289,11 +319,12 @@ bool	Server::_handleJoin(Client& cli, const s_Line& sline) {
 }
 
 
-//? Command:  
-//? Parameters:  
-//? ===> 
-//? message <=== 
-//? message <=== 
+//? Command:  PART
+//? Parameters:  <channel>{,<channel>} [<reason>]
+//? ===>  PART #twilight_zone 		; leave channel "#twilight_zone"
+//? ===>  PART #oz-ops,&group5 		; leave both channels "&group5" and "#oz-ops".
+//? message <=== :dan-!d@localhost PART #test			; dan- is leaving the channel #test
+
 bool	Server::_handlePart(Client& cli, const s_Line& sline) {
 
 	std::string	clientNick = (cli.getNickname().empty() ? "*" :  cli.getNickname());
@@ -318,6 +349,11 @@ bool	Server::_handlePart(Client& cli, const s_Line& sline) {
 		}
 		if (channelName.empty())
 			continue;
+		std::string prefix = ":" + clientNick + "!" + cli.getUsername() + "@" + cli.ipAddr;
+		std::string message = prefix + " " + sline.command + " " + channelName;
+		if (!reason.empty()) {
+			message += (" :"  + reason);
+		}
 		Channel*	pChan = getChannel(channelName);
 		if (pChan != NULL) {
 			if (pChan->isMember(cli.fd)) {
@@ -325,11 +361,6 @@ bool	Server::_handlePart(Client& cli, const s_Line& sline) {
 				std::map<int, Channel::MemberState>::const_iterator membersIt = chanMembers.begin();
 				bool	foundChanOp = false;
 				for (; membersIt != chanMembers.end(); ++membersIt) {
-					std::string prefix = ":" + clientNick + "!" + cli.getUsername() + "@" + cli.ipAddr;
-					std::string message = prefix + " " + sline.command + " " + channelName;
-					if (!reason.empty()) {
-						message += " :"  + reason;
-					}
 					if (!foundChanOp && membersIt->first != cli.fd && membersIt->second.isChanOp == true) {
 						foundChanOp = true;
 					}
@@ -372,59 +403,25 @@ bool	Server::_handlePart(Client& cli, const s_Line& sline) {
 }
 
 
-//? Command:  
-//? Parameters:  
-//? ===> 
-//? message <=== 
-//? message <=== 
-// client send QUIT command to quit the server
+//? Command:  QUIT
+//? Parameters:  [<reason>]
+//? ===> QUIT :Gone to have lunch		; Client exiting from the network
+//? message <=== :dan-!d@localhost QUIT :Quit: Bye for now!			; dan- is exiting the network with the message: "Quit: Bye for now!"
+
 bool	Server::_handleQuit(Client& cli, const s_Line& sline) {
 
-	std::string					reason = (sline.params.empty() ? "" : sline.params[0]); 
-
+	
 	// construct the notification message
 	std::string					nick = cli.getNickname().empty() ? "*" : cli.getNickname();
 	std::string					username = cli.getUsername().empty() ? "*" : cli.getUsername(); 
 	std::string					prefix = ":" + nick + "!" + username + "@" + cli.ipAddr;
+	std::string					reason = (sline.params.empty() ? "" : sline.params[0]); 
 	std::string					message =  prefix + " " + sline.command + " :Quit:" + (reason.empty() ? "" : " " + reason);
 
-
+	// send QUIT message to all the members that shares a channel with the issuer
 	std::vector<std::string>	cliChannels = cli.getSubscribedChannels();
-	std::set<int>				listMembersToNotify;
+	_notifyChanMembers(cliChannels, cli.fd, message);
 
-	// loop on the client's channel list
-	for (std::size_t i = 0; i < cliChannels.size(); ++i) {
-		std::string			channelName = cliChannels[i];
-		std::map<std::string, Channel>::iterator chanIt = _channelList.find(channelName);
-		if (chanIt == _channelList.end()) {
-			continue;
-		}
-		Channel&								channel = chanIt->second;
-
-		const std::map<int, Channel::MemberState>& 	members = channel.getMembers();
-
-		// create list of the members to notify 
-		// with a unique key container std::set<int>,
-		//  to only send the msg once even if the member shares > 1 channel with the quitting member
-		std::map<int, Channel::MemberState>::const_iterator it = members.begin();
-		bool	foundChanOp = false;
-		for (; it != members.end(); ++it) {
-			if (it->first == cli.fd) {
-				continue;
-			}
-			if (!foundChanOp && it->second.isChanOp) {
-				foundChanOp = true;
-			}
-			listMembersToNotify.insert(it->first);
-		}
-		if (!foundChanOp && members.begin() != members.end()) {
-			channel.updateMemberState(members.begin()->first, true);
-		}
-	}
-	// send QUIT notification to the members on the list of the members to notify
-	for (std::set<int>::iterator it = listMembersToNotify.begin(); it != listMembersToNotify.end(); ++it) {
-		_sendToClient(*it, message);
-	}
 	// send a QUIT acknowledgement to the client
 	message = "ERROR :Closing Link: Quit:";
 	if (!reason.empty()) {
@@ -439,11 +436,9 @@ bool	Server::_handleQuit(Client& cli, const s_Line& sline) {
 }
 
 
-//? Command:  
-//? Parameters:  
-//? ===> 
-//? message <=== 
-//? message <=== 
+//? Command:  PING
+//? Parameters:  <token>
+
 bool	Server::_handlePing(Client& cli, const s_Line& sline) {
 
 	std::string clientNick = (cli.getNickname().empty() ? "*" : cli.getNickname());
@@ -552,6 +547,7 @@ bool	Server::_handlePrivmsg(Client& cli, const s_Line& sline) {
 //? ===> KICK #Finnish Matthew ; Command to kick Matthew from #Finnish
 //? ===> KICK #Finnish John :Speaking English; Command to kick John from #Finnish using "Speaking English" as the reason (comment).
 //? message <=== :WiZ!jto@tolsun.oulu.fi KICK #Finnish John; KICK message on channel #Finnish from WiZ to remove John from channel
+
 bool	Server::_handleKick(Client& cli, const s_Line& sline) {
 	std::string	clientNick = cli.getNickname();
 
@@ -637,6 +633,7 @@ bool	Server::_handleKick(Client& cli, const s_Line& sline) {
 //? Parameters: <nickname> <channel>
 //? ====> INVITE Wiz #foo_bar    ; Invite Wiz to #foo_bar
 //? message <==== :dan-!d@localhost INVITE Wiz #test    ; dan- has invited Wiz to the channel #test
+
 bool	Server::_handleInvite(Client& cli, s_Line& sline) {
 
 	std::string	clientNick = cli.getNickname();
@@ -721,6 +718,7 @@ bool	Server::_handleInvite(Client& cli, s_Line& sline) {
 //? ===> TOPIC #test :New topic		; Setting the topic on "#test" to "New topic".
 //? ===> TOPIC #test :				; Clearing the topic on "#test"
 //? ===> TOPIC #test				; Checking the topic for "#test"
+
 bool	Server::_handleTopic(Client& cli, s_Line& sline) {
 	std::string	clientNick = cli.getNickname();
 
@@ -797,6 +795,7 @@ bool	Server::_handleTopic(Client& cli, s_Line& sline) {
 //? ===> MODE #chan1			; Getting modes for a channel (and channel creation time):
 //? message <=== :dan!~h@localhost MODE #foobar -l+i  ; dan removed the client limit from, and set the #foobar channel to invite-only.
 //? message <=== :irc.example.com MODE #foobar +o bunny		; The irc.example.com server gave channel operator privileges to bunny on #foobar.
+
 bool	Server::_handleMode(Client& cli, s_Line& sline) {
 	std::string	clientNick = cli.getNickname();
 	if (clientNick.empty()) {

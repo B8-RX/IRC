@@ -20,7 +20,7 @@
 
 bool Server::_signalReceived = false;
 
-Server::Server(uint16_t port, const std::string& password) : _serverName("irc.local"), _password(password), _passwordEnabled(!(_password.empty())), _port(port) {}
+Server::Server(uint16_t port, const std::string& password) : _serverName("irc.local"), _creationTime(std::time(0)), _password(password), _passwordEnabled(!(_password.empty())), _port(port) {}
 
 Server::~Server(void) {}
 
@@ -188,16 +188,16 @@ void	Server::_cleanupClient(const Client& cli, const std::string& cmd) {
 			const std::map<int, Channel::MemberState>&	chanMembers = channel.getMembers();
 			std::map<int, Channel::MemberState>::const_iterator membersIt = chanMembers.begin();
 			bool	foundChanOp = false;
-			if (cmd.empty()) {
-				for (; membersIt != chanMembers.end(); ++membersIt) {
-					std::string prefix = ":" + cli.getNickname() + "!" + cli.getUsername() + "@" + cli.ipAddr;
-					message = prefix + " QUIT :Connection closed";
-					if (!foundChanOp && membersIt->first != cli.fd && membersIt->second.isChanOp == true) {
-						foundChanOp = true;
-					}
-					if (membersIt->first == cli.fd || notifiedUser.find(membersIt->first) != notifiedUser.end()) {
-						continue;
-					}
+			std::string prefix = ":" + cli.getNickname() + "!" + cli.getUsername() + "@" + cli.ipAddr;
+			message = prefix + " QUIT :Connection closed";
+			for (; membersIt != chanMembers.end(); ++membersIt) {
+				if (!foundChanOp && membersIt->first != cli.fd && membersIt->second.isChanOp == true) {
+					foundChanOp = true;
+				}
+				if (membersIt->first == cli.fd || notifiedUser.find(membersIt->first) != notifiedUser.end()) {
+					continue;
+				}
+				if (cmd.empty()) {
 					_sendToClient(membersIt->first, message);
 					notifiedUser.insert(membersIt->first);
 				}
@@ -308,4 +308,26 @@ Channel*	Server::getChannel(const std::string& name) {
 		return (NULL);
 	}
 	return (&it->second);
+}
+
+time_t	Server::getCreationTime(void) const {
+	return (_creationTime);
+}
+
+std::string	Server::getChanListStr(void) const {
+	std::map<std::string, Channel>::const_iterator chanListIt = _channelList.begin();
+	std::string	chanListStr = "";
+	for (; chanListIt != _channelList.end(); ++chanListIt) {
+		chanListStr += (" " + chanListIt->first);
+	}
+	return (chanListStr);
+}
+
+std::size_t	Server::getChanListCount(void) const {
+	std::map<std::string, Channel>::const_iterator chanListIt = _channelList.begin();
+	std::size_t count = 0;
+	for (; chanListIt != _channelList.end(); ++chanListIt) {
+		count++;
+	}
+	return (count);
 }

@@ -174,4 +174,3 @@ bool	Channel::updateMemberState(int memberFd, bool isOp) {
 	member->second.isChanOp = isOp;
 	return (true);
 }
-

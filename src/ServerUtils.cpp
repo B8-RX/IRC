@@ -5,6 +5,7 @@
 #include <cerrno>
 #include <cstring>
 #include <sstream>
+#include <ctime>
 
 void    Server::_printLine(const Server::s_Line& sLine) const {
 	std::cout << "raw line: [" << sLine.raw << "]\n";
@@ -40,8 +41,11 @@ std::string	Server::_generateLogInfo(const s_Line& sline, const Client& cli, con
 	if (nickName.empty()) {
 		nickName = "*";
 	}
-
-	if (sline.command == "PASS") {
+	
+	if (info == "registered") {
+		message = " " + nickName + std::string(YELLOW) + " registration was successful" + std::string(GREEN);  
+	}
+	else if (sline.command == "PASS") {
 		message = "password accepted !";
 	}
 	else if (sline.command == "NICK") {
@@ -445,12 +449,77 @@ void	Server::_sendErrUserNotInChannel(Client& cli, const std::string& nick, cons
 	_sendToClient(cli.fd, line);
 }
 
-bool	Server::_isUnique(std::vector<char>& vMode, char mode) const {
-	std::vector<char>::iterator	vModeIt = vMode.begin();
-	for (; vModeIt != vMode.end(); ++vModeIt) {
-		if (*vModeIt == mode) {
-			break;
+void	Server::_notifyChanMembers(const std::vector<std::string>& cliChannels, int clientFd, const std::string& msg) {
+	std::set<int>				listMembersToNotify;
+	
+	// loop on the client's channel list to store the fd member to notify (unique broadcast per member)
+	for (std::size_t i = 0; i < cliChannels.size(); ++i) {
+		std::string			channelName = cliChannels[i];
+		std::map<std::string, Channel>::iterator chanIt = _channelList.find(channelName);
+		if (chanIt == _channelList.end()) {
+			continue;
+		}
+
+		Channel&								channel = chanIt->second;
+		const std::map<int, Channel::MemberState>& 	members = channel.getMembers();
+		std::map<int, Channel::MemberState>::const_iterator it = members.begin();
+		for (; it != members.end(); ++it) {
+			if (it->first == clientFd) {
+				continue;
+			}
+			if (listMembersToNotify.find(it->first) == listMembersToNotify.end()) {
+				_sendToClient(it->first, msg);
+				listMembersToNotify.insert(it->first);
+			}
 		}
 	}
-	return (vModeIt == vMode.end());
+}
+
+void	Server::_sendRplWelcome(const Client& cli) const {
+	std::string	numeric = " 001 ";
+	std::string	prefixServer = ":" + _serverName;
+	std::string	nick = cli.getNickname();
+	std::string	username = cli.getUsername();
+	std::string	ipAddr	= cli.ipAddr;
+	std::string prefixClient = nick + "!" + username + "@" + ipAddr;
+	std::string subject	= " :Welcome to the localhost Network, ";
+	std::string message = prefixServer + numeric + nick + subject + prefixClient; 
+	
+	_sendToClient(cli.fd, message);
+}
+
+void	Server::_sendRplYourHost(const Client& cli) const {
+	std::string	numeric = " 002 ";
+	std::string	prefixServer = ":" + _serverName;
+	std::string	nick = cli.getNickname();
+	std::string subject	= " :Your host is " + _serverName;
+	std::string message = prefixServer + numeric + nick + subject; 
+	
+	_sendToClient(cli.fd, message);
+}
+
+void	Server::_sendRplCreated(const Client& cli) const {
+	std::string	numeric = " 003 ";
+	std::string	prefixServer = ":" + _serverName;
+	std::string	nick = cli.getNickname();
+	time_t	creation = getCreationTime();
+	char* timeStr = ctime(&creation);
+	std::string cleanTime(timeStr);
+
+	if (!cleanTime.empty() && cleanTime[cleanTime.size() - 1] == '\n') {
+    	cleanTime.erase(cleanTime.size() - 1);
+	}
+	std::string subject	= " :This server was created " + cleanTime;
+	std::string message = prefixServer + numeric + nick + subject; 
+	_sendToClient(cli.fd, message);
+}
+
+void	Server::_sendRplMyInfo(const Client& cli) const {
+	std::string	numeric = " 004 ";
+	std::string	nick = cli.getNickname();
+	std::string modes	= " itkol are supported by this server";
+	std::string message = ":" + _serverName + numeric + nick + " " + _serverName + modes; 
+
+	_sendToClient(cli.fd, message);
+
 }

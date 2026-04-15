@@ -32,11 +32,14 @@ class Server {
 		void	init(void);
 		void	run(void);
 		
+		time_t							getCreationTime(void) const;
 		std::size_t						clientCount(void) const;
 		std::size_t						channelCount(void) const;
 		Client*							getClient(int clienFd);
 		Client*							getClientByNick(const std::string& nick);
 		Channel*						getChannel(const std::string& name);
+		std::string						getChanListStr(void) const;
+		std::size_t						getChanListCount(void) const;
 		struct s_Line {
 			std::string					raw;
 			std::string					prefix;
@@ -46,6 +49,7 @@ class Server {
 
 	private:
 		std::string						_serverName;
+		const time_t							_creationTime;
 		std::string						_password;
 		bool							_passwordEnabled;
 		static bool						_signalReceived;
@@ -65,8 +69,9 @@ class Server {
 		void							_closeServer(void);
 
 		// messaging
+		void							_notifyChanMembers(const std::vector<std::string>& chanList, int clientFd, const std::string& msg);
 		void							_sendToClient(int clientFd, const std::string& message) const;
-
+	
 		void							_sendErrNeedMoreParams(Client& cli, const std::string& nick, const s_Line& sline, const std::string& cmd) const;
 		void							_sendErrAlreadyRegistered(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const;
 		void							_sendErrNoNickNameGiven(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const;
@@ -90,7 +95,10 @@ class Server {
 		void							_sendErrInviteOnlyChan(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
 		void							_sendErrUnknownMode(Client& cli, const std::string& nick, const s_Line& sline, const char mode) const;
 		
-		
+		void							_sendRplWelcome(const Client& cli) const;
+		void							_sendRplYourHost(const Client& cli) const;
+		void							_sendRplCreated(const Client& cli) const;
+		void							_sendRplMyInfo(const Client& cli) const;
 		void							_sendRplInviteList(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const;
 		void							_sendEndOfInviteList(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const;
 		void							_sendRplInviting(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
@@ -142,7 +150,6 @@ class Server {
 		bool    						_isValidNick(const std::string& nick) const;
 		bool							_isUsedNick(std::map<int, Client>& ClientsList, const std::string& nick, int clientFd) const;
 		bool							_isValidChannelName(const std::string& name) const;
-		bool							_isUnique(std::vector<char>& vMode, char mode) const;
 	public:
 		static void	sighandler(int signum);
 		class	ErrorException : public std::exception {
