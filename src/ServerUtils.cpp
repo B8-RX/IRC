@@ -29,7 +29,7 @@ void	Server::_printLogServer(const std::string& type, const Client& cli, const s
 	if (sline.command == "PRIVMSG" && type == "INFO") {
 		color = BLUE;
 	}
-	std::cout << color << "[" << type << "]: " << message << " [END]" << RESET << "\n";
+	std::cout << color << "[" << type << "]" << message << " [END]" << RESET << "\n";
 }
 
 std::string	Server::_generateLogInfo(const s_Line& sline, const Client& cli, const std::string& info) const{
@@ -46,22 +46,22 @@ std::string	Server::_generateLogInfo(const s_Line& sline, const Client& cli, con
 	}
 	else if (sline.command == "NICK") {
 		if (cli.getOldNickname().empty()) {
-			message = "nickname " + nickName + std::string(YELLOW) + " was created" + std::string(GREEN) ; 
+			message = " nickname " + nickName + std::string(YELLOW) + " was created" + std::string(GREEN) ; 
 		} 
 		else {
-			message = cli.getOldNickname() + std::string(YELLOW) + " changed her nickname to " + std::string(GREEN)  + sline.params[0];
+			message = " " + cli.getOldNickname() + std::string(YELLOW) + " changed her nickname to " + std::string(GREEN)  + sline.params[0];
 		}
 	}
 	else if (sline.command == "USER") {
 		if (cli.hasNick) {
-			message = nickName + std::string(YELLOW) + " added her username "  + std::string(GREEN) + sline.params[0]; 
+			message = " " + nickName + std::string(YELLOW) + " added her username "  + std::string(GREEN) + sline.params[0]; 
 		} 
 		else {
-			message = "username " + sline.params[0] + std::string(YELLOW) + " was created" + std::string(GREEN) ; 
+			message = " username " + sline.params[0] + std::string(YELLOW) + " was created" + std::string(GREEN) ; 
 		}
 	}
 	else if (sline.command == "PING") {
-			message = nickName + "@" + cli.ipAddr + std::string(YELLOW) +  " send PING" + std::string(GREEN) ; 
+			message = " " + nickName + "@" + cli.ipAddr + std::string(YELLOW) +  " send PING" + std::string(GREEN) ; 
 	}
 	else if (sline.command == "JOIN") {
 		const std::map<std::string, Channel>::const_iterator chanIt = _channelList.find(info);
@@ -69,20 +69,20 @@ std::string	Server::_generateLogInfo(const s_Line& sline, const Client& cli, con
 		if (chanIt != _channelList.end() && (chanIt->second.memberCount() == 1)) {
 			sujet = " created channel ";
 		}
-		message =  nickName + std::string(YELLOW) + sujet  + std::string(GREEN) + info; 
+		message =  " " + nickName + std::string(YELLOW) + sujet  + std::string(GREEN) + info; 
 	}
 	else if (sline.command == "QUIT") {
-		message = nickName + std::string(YELLOW) + " disconnected" + std::string(GREEN); 
+		message = " " + nickName + std::string(YELLOW) + " disconnected" + std::string(GREEN); 
 	}
 	else if (sline.command == "PART") {
-		message = nickName + std::string(YELLOW) + " unsubscribed from channel " + std::string(GREEN) + info; 
+		message = " " + nickName + std::string(YELLOW) + " unsubscribed from channel " + std::string(GREEN) + info; 
 	}
 	else if (sline.command == "PRIVMSG") {
-		message = nickName + " send message to " + info; 
+		message = " " + nickName + " send message to " + info; 
 	}
 	else if (sline.command == "KICK") {
 		std::string reason = (sline.params.size() >= 3 ? sline.params[2] : "");
-		message = nickName + std::string(YELLOW) + " kicked " + std::string(GREEN) + info + " from channel " + sline.params[0];
+		message = " " + nickName + std::string(YELLOW) + " kicked " + std::string(GREEN) + info + " from channel " + sline.params[0];
 		if (!reason.empty()) {
 			message += " reason:" + std::string(RED) + "(" + reason + ")" + std::string(GREEN);
 		}
@@ -90,7 +90,7 @@ std::string	Server::_generateLogInfo(const s_Line& sline, const Client& cli, con
 	else if (sline.command == "INVITE") {
 		std::string invitedUser = sline.params[0];
 		std::string chanName = sline.params[1];
-		message = nickName + std::string(YELLOW) + " invited " + std::string(GREEN) + invitedUser+ " to channel " + chanName; 
+		message = " " + nickName + std::string(YELLOW) + " invited " + std::string(GREEN) + invitedUser+ " to channel " + chanName; 
 	}
 	else if (sline.command == "TOPIC") {
 		std::string chanName = info;
@@ -98,11 +98,11 @@ std::string	Server::_generateLogInfo(const s_Line& sline, const Client& cli, con
 		if (sline.params.size() > 1) {
 			sujet = " edit the topic of the channel ";
 		}
-		message = nickName + std::string(YELLOW) + sujet + std::string(GREEN) + chanName;  
+		message = " " + nickName + std::string(YELLOW) + sujet + std::string(GREEN) + chanName;  
 	}
 	else if (sline.command == "MODE") {
 		std::string chanName = sline.params[0];
-		message = nickName + std::string(YELLOW) + " change mode on channel " + std::string(GREEN) + chanName + " (" + info + ")";  
+		message = " " + nickName + std::string(YELLOW) + " change mode on channel " + std::string(GREEN) + chanName + " (" + info + ")";  
 
 	}
 	return (message);
@@ -415,7 +415,7 @@ void	Server::_sendRplWhoTime(Client& cli, const std::string& nick, const s_Line&
 void	Server::_sendRplChannelModeIs(Client& cli, const std::string& nick, const s_Line& sline, const std::string& modeStringAndParams) const {
 	std::string	channelName = sline.params[0];
 	std::string numeric = " 324 ";
-	std::string line = ":" + _serverName + numeric + " " + nick + " " + channelName + " " + modeStringAndParams;
+	std::string line = ":" + _serverName + numeric + nick + " " + channelName + " " + modeStringAndParams;
 	_printLogServer("DEBUG", cli, sline, line);
 	_sendToClient(cli.fd, line);
 }
@@ -425,7 +425,7 @@ void	Server::_sendRplCreationTime(Client& cli, const std::string& nick, const s_
 	std::string numeric = " 329 ";
 	std::ostringstream oss;
 	oss << creationTime;
-	std::string line = ":" + _serverName + numeric + " " + nick + " " + channelName + " " + oss.str();
+	std::string line = ":" + _serverName + numeric + nick + " " + channelName + " " + oss.str();
 	_printLogServer("DEBUG", cli, sline, line);
 	_sendToClient(cli.fd, line);
 }

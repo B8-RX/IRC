@@ -321,14 +321,14 @@ bool	Server::_handlePart(Client& cli, const s_Line& sline) {
 		Channel*	pChan = getChannel(channelName);
 		if (pChan != NULL) {
 			if (pChan->isMember(cli.fd)) {
-				std::map<int, Channel::MemberState>&	chanMembers = pChan->getMembers();
-				std::map<int, Channel::MemberState>::iterator membersIt = chanMembers.begin();
+				const std::map<int, Channel::MemberState>&	chanMembers = pChan->getMembers();
+				std::map<int, Channel::MemberState>::const_iterator membersIt = chanMembers.begin();
 				bool	foundChanOp = false;
 				for (; membersIt != chanMembers.end(); ++membersIt) {
 					std::string prefix = ":" + clientNick + "!" + cli.getUsername() + "@" + cli.ipAddr;
-					std::string message = CYAN + prefix + " " + sline.command + " " + channelName + std::string(RESET);
+					std::string message = prefix + " " + sline.command + " " + channelName;
 					if (!reason.empty()) {
-						message += " :"  + std::string(RESET) + reason;
+						message += " :"  + reason;
 					}
 					if (!foundChanOp && membersIt->first != cli.fd && membersIt->second.isChanOp == true) {
 						foundChanOp = true;
@@ -337,10 +337,23 @@ bool	Server::_handlePart(Client& cli, const s_Line& sline) {
 				}
 				pChan->removeMember(cli.fd);
 				cli.removeSubscribedChannel(channelName);
-				if (!foundChanOp && chanMembers.begin() != chanMembers.end()) {
-					pChan->updateMemberState(chanMembers.begin()->first, true);
-				}
 				_printLogServer("INFO", cli, sline, channelName);
+
+				// if the channel is not empty and there are no operator, give the status to the first member
+				if (pChan->memberCount() > 0 && !foundChanOp) {
+					int newOpFd = -1;
+					std::string	newOpNick;
+					std::string msg = ":" + _serverName + " MODE " + channelName + " +o ";
+					std::map<int, Channel::MemberState>&	members = pChan->getMembers();
+					std::map<int, Channel::MemberState>::iterator opMemberIt = members.begin();
+					newOpFd = opMemberIt->first;
+					pChan->updateMemberState(newOpFd, true);
+					newOpNick = getClient(newOpFd)->getNickname();
+					msg += newOpNick;
+					for (; opMemberIt != members.end(); ++opMemberIt) {
+						_sendToClient(opMemberIt->first, msg);
+					}
+				}
 				if (pChan->empty()) {
 					_channelList.erase(_channelList.find(channelName));
 					std::cout << "channel [" << channelName << "] have 0 member. Channel have been deleted successfully.\n";
@@ -367,14 +380,13 @@ bool	Server::_handlePart(Client& cli, const s_Line& sline) {
 // client send QUIT command to quit the server
 bool	Server::_handleQuit(Client& cli, const s_Line& sline) {
 
-	typedef std::map<int, Channel::MemberState> ChannelMembersMap;
 	std::string					reason = (sline.params.empty() ? "" : sline.params[0]); 
 
 	// construct the notification message
 	std::string					nick = cli.getNickname().empty() ? "*" : cli.getNickname();
 	std::string					username = cli.getUsername().empty() ? "*" : cli.getUsername(); 
 	std::string					prefix = ":" + nick + "!" + username + "@" + cli.ipAddr;
-	std::string					message = CYAN +  prefix + " " + sline.command + " :Quit:" + (reason.empty() ? "" : " " + reason) + RESET;
+	std::string					message =  prefix + " " + sline.command + " :Quit:" + (reason.empty() ? "" : " " + reason);
 
 
 	std::vector<std::string>	cliChannels = cli.getSubscribedChannels();
@@ -387,13 +399,14 @@ bool	Server::_handleQuit(Client& cli, const s_Line& sline) {
 		if (chanIt == _channelList.end()) {
 			continue;
 		}
-		Channel&			channel = chanIt->second;
-		ChannelMembersMap& 	members = channel.getMembers();
+		Channel&								channel = chanIt->second;
+
+		const std::map<int, Channel::MemberState>& 	members = channel.getMembers();
 
 		// create list of the members to notify 
 		// with a unique key container std::set<int>,
 		//  to only send the msg once even if the member shares > 1 channel with the quitting member
-		ChannelMembersMap::const_iterator it = members.begin();
+		std::map<int, Channel::MemberState>::const_iterator it = members.begin();
 		bool	foundChanOp = false;
 		for (; it != members.end(); ++it) {
 			if (it->first == cli.fd) {
@@ -413,15 +426,15 @@ bool	Server::_handleQuit(Client& cli, const s_Line& sline) {
 		_sendToClient(*it, message);
 	}
 	// send a QUIT acknowledgement to the client
-	message = std::string(CYAN) + "ERROR :Closing Link: Quit:" + std::string(RESET);
+	message = "ERROR :Closing Link: Quit:";
 	if (!reason.empty()) {
-		message += " "  + std::string(RESET) + reason;
+		message += " "  + reason;
 	}
 	_sendToClient(cli.fd, message);
 	_printLogServer("INFO", cli, sline, sline.command);
 	
 	// clean the client from the server and close his socket
-	_cleanupClient(cli);
+	_cleanupClient(cli, sline.command);
 	return (true);
 }
 
@@ -763,7 +776,7 @@ bool	Server::_handleTopic(Client& cli, s_Line& sline) {
 		std::string topic = sline.params[1];
 		pChan->setTopic(topic);
 		pChan->setTopicAuthor(clientNick);
-		pChan->setTimestamp();
+		pChan->setTopicTimestamp();
 		_printLogServer("INFO", cli, sline, channelName);
 
 		//? Broadcast a TOPIC command to every client on the channel also for the author
@@ -818,7 +831,6 @@ bool	Server::_handleMode(Client& cli, s_Line& sline) {
 		modestring = sline.params[1];
 	}
 	std::size_t paramKeyPos = std::string::npos;
-	std::size_t	signCount = 0;
 	// check if <modestring> (sline.params[1]) is not given
 	//!	RPL_CHANNELMODEIS (324)
 	//!	RPL_CREATIONTIME (329)
@@ -840,21 +852,18 @@ bool	Server::_handleMode(Client& cli, s_Line& sline) {
 			_sendErrChaNoPrivsNeeded(cli, clientNick, sline, channelName);
 			return (false);
 		}
-		Channel::s_mode	smode;
 		std::size_t	paramIndex = 2;
-		smode.add = false;
-		smode.minus = false;
+		Channel::s_mode	smode;
+		smode.sign = '\0';
 		for (std::size_t i = 0; i < modestring.size(); ++i) {
 			smode.mode = modestring[i];
 			if (smode.mode == '+') {
 				smode.add = true;
 				smode.minus = false;
-				signCount++;
 			}
 			else if (smode.mode == '-') {
 				smode.add = false;
 				smode.minus = true;
-				signCount++;
 			}
 			else {
 				smode.param.clear();
@@ -863,42 +872,53 @@ bool	Server::_handleMode(Client& cli, s_Line& sline) {
 				}
 				paramIndex += _handleSingleMode(smode, *pChan, cli, sline);	
 				if (smode.add && smode.mode == 'k') {
-						paramKeyPos = i - signCount;
+						paramKeyPos = i - 1;
+				}
+				smode.sign = (smode.add ? '+' : smode.minus ? '-' : '\0');
+			}
+		}
+		
+		// send to members the changes if there is consumed mode(s)
+
+		if (!smode.vMode.empty()) {
+			// construct the consumed mode(s) 
+			modestring.clear();
+			for (std::size_t i = 0; i < smode.vMode.size(); ++i) {
+				modestring += smode.vMode[i];
+			}
+	
+			// construct the consumed parameter(s) of the consumed mode(s) above
+			std::string paramsFull;
+			std::string paramsFullChanOp;
+			for (std::size_t i = 0; i < smode.vParam.size(); ++i) {
+				if (paramKeyPos != std::string::npos && i == paramKeyPos) {
+						paramsFullChanOp += (" " + smode.vParam[i]);
+					continue;
+				}
+				paramsFull += (" " + smode.vParam[i]);
+				paramsFullChanOp += (" " + smode.vParam[i]);
+			}
+	
+			// construct broadcast message
+			std::string prefix = ":" + cli.getNickname() + "!" + cli.getUsername() + "@" + cli.ipAddr;
+			std::string message = prefix + " MODE " + channelName + " " + modestring;
+			
+			const std::map<int, Channel::MemberState>& members = pChan->getMembers();
+			std::map<int, Channel::MemberState>::const_iterator membIt = members.begin();
+	
+	
+			// notify all channel members of the mode(s) changes 
+			for (; membIt != members.end(); ++membIt) {
+				if (membIt->second.isChanOp) {
+					_sendToClient(membIt->first, message + paramsFullChanOp);
+				}
+				else {
+					_sendToClient(membIt->first, message + paramsFull);
 				}
 			}
+			std::string messageServerLog = modestring + paramsFullChanOp;
+			_printLogServer("INFO", cli, sline, messageServerLog);
 		}
-		
-		// send to members the changes
-		std::string paramsFull;
-		std::string paramsFullChanOp;
-		for (std::size_t i = 0; i < smode.vParam.size(); ++i) {
-			if (paramKeyPos != std::string::npos && i == paramKeyPos) {
-					paramsFullChanOp += (" " + smode.vParam[i]);
-				continue;
-			}
-			paramsFull += (" " + smode.vParam[i]);
-			paramsFullChanOp += (" " + smode.vParam[i]);
-		}
-		modestring.clear();
-		for (std::size_t i = 0; i < smode.vMode.size(); ++i) {
-			modestring += smode.vMode[i];
-		}
-		std::string prefix = ":" + cli.getNickname() + "!" + cli.getUsername() + "@" + cli.ipAddr;
-		std::string message = prefix + " MODE " + channelName + " " + modestring;
-		
-		const std::map<int, Channel::MemberState>& members = pChan->getMembers();
-		std::map<int, Channel::MemberState>::const_iterator membIt = members.begin();
-
-		for (; membIt != members.end(); ++membIt) {
-			if (membIt->second.isChanOp) {
-				_sendToClient(membIt->first, message + paramsFullChanOp);
-			}
-			else {
-				_sendToClient(membIt->first, message + paramsFull);
-			}
-		}
-		std::string messageServerLog = modestring + paramsFullChanOp;
-		_printLogServer("INFO", cli, sline, messageServerLog);
 	}
 	return (true);
 }
@@ -909,6 +929,10 @@ int	Server::_handleSingleMode(Channel::s_mode& smode, Channel& chan, Client& cli
 	std::string	userName = smode.param;
 	switch (smode.mode) {
 		case 'o' : {
+			if (userName.empty()) {
+				_sendErrNeedMoreParams(cli, cli.getNickname(), sline, sline.command);
+				return (ret);
+			}
 			Client* user = getClientByNick(userName);
 			if (user == NULL) {
 				_sendErrNoSuchNick(cli, cli.getNickname(), sline, userName);
@@ -919,10 +943,10 @@ int	Server::_handleSingleMode(Channel::s_mode& smode, Channel& chan, Client& cli
 				}
 				else {
 					chan.updateMemberState(user->fd, smode.add);
-					if (smode.add && _isUnique(smode.vMode, '+')) {
+					if (smode.add && (smode.sign != '+')) {
 						smode.vMode.push_back('+');
 					}
-					else if (smode.minus && _isUnique(smode.vMode, '-')) {
+					else if (smode.minus && (smode.sign != '-')) {
 						smode.vMode.push_back('-');
 					}
 					smode.vParam.push_back(smode.param);
@@ -933,21 +957,21 @@ int	Server::_handleSingleMode(Channel::s_mode& smode, Channel& chan, Client& cli
 		}
 		break;
 		case 'i' : 
-			chan.setInviteOnly(smode.add);
-			if (smode.add && _isUnique(smode.vMode, '+')) {
+			if (smode.add && (smode.sign != '+')) {
 				smode.vMode.push_back('+');
 			}
-			else if (smode.minus && _isUnique(smode.vMode, '-')) {
+			else if (smode.minus && (smode.sign != '-')) {
 				smode.vMode.push_back('-');
 			}
 			smode.vMode.push_back(smode.mode);
-			break;
+			chan.setInviteOnly(smode.add);
+		break;
 		case 't' : 
 			chan.setTopicRestricted(smode.add);
-			if (smode.add && _isUnique(smode.vMode, '+')) {
+			if (smode.add && (smode.sign != '+')) {
 				smode.vMode.push_back('+');
 			}
-			else if (smode.minus && _isUnique(smode.vMode, '-')) {
+			else if (smode.minus && (smode.sign != '-')) {
 				smode.vMode.push_back('-');
 			}
 			smode.vMode.push_back(smode.mode);
@@ -958,36 +982,44 @@ int	Server::_handleSingleMode(Channel::s_mode& smode, Channel& chan, Client& cli
 				std::size_t limit;
 				if (iss >> limit && limit > 0) {
 					chan.setLimit(limit);
-					if (smode.add && _isUnique(smode.vMode, '+')) {
+					if (smode.add && (smode.sign != '+')) {
 						smode.vMode.push_back('+');
 					}
-					else if (smode.minus && _isUnique(smode.vMode, '-')) {
+					else if (smode.minus && (smode.sign != '-')) {
 						smode.vMode.push_back('-');
 					}
 				}
+				smode.vMode.push_back(smode.mode);
+				smode.vParam.push_back(smode.param);
 				ret = 1;
 			}
-			else if (smode.minus && _isUnique(smode.vMode, '-')) {
+			else if (smode.minus && (smode.sign != '-')) {
 				smode.vMode.push_back('-');
+				smode.vMode.push_back(smode.mode);
 				chan.unsetLimit();
 			}
-			smode.vParam.push_back(smode.param);
-			smode.vMode.push_back(smode.mode);				
+			else {
+				_sendErrNeedMoreParams(cli, cli.getNickname(), sline, sline.command);
+			}	
 		break;
 		case 'k' : 
 			if (smode.add && !smode.param.empty()) {
 				chan.setKey(smode.param);
-				if (smode.add && _isUnique(smode.vMode, '+')) {
+				if (smode.add && (smode.sign != '+')) {
 					smode.vMode.push_back('+');
 				}
 				ret = 1;
+				smode.vMode.push_back(smode.mode);
+				smode.vParam.push_back(smode.param);
 			}
-			else if (smode.minus && _isUnique(smode.vMode, '-')) {
+			else if (smode.minus && (smode.sign != '-')) {
 				smode.vMode.push_back('-');
+				smode.vMode.push_back(smode.mode);
 				chan.unsetKey();
 			}
-			smode.vParam.push_back(smode.param);
-			smode.vMode.push_back(smode.mode);
+			else {
+				_sendErrNeedMoreParams(cli, cli.getNickname(), sline, sline.command);
+			}
 		break;
 		default:
 			_sendErrUnknownMode(cli, cli.getNickname(), sline, smode.mode);

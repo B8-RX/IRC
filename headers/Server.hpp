@@ -61,7 +61,7 @@ class Server {
 		int								_serverSocket;
 		void							_handleNewClient(void);
 		void							_handleReceivedData(int clientFd);
-		void							_cleanupClient(const Client& cli);
+		void							_cleanupClient(const Client& cli, const std::string& cmd);
 		void							_closeServer(void);
 
 		// messaging

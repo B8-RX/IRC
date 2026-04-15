@@ -55,9 +55,7 @@
 		const std::string			getTopicAuthor(void) const;
 		void						setTopic(const std::string& topic);
 		void						setTopicAuthor(const std::string& author);
-		void						setTimestamp(void);
-		std::time_t					getTimestamp(void) const;
-
+		void						setTopicTimestamp(void);
 
 		// channel modes
 		struct	s_mode {
@@ -67,6 +65,7 @@
 			char 						mode;
 			bool						add;
 			bool						minus;
+			char						sign;
 		};
 		bool						isMode(const std::string& mode) const;
 		void						setInviteOnly(bool);

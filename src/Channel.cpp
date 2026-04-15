@@ -90,12 +90,8 @@ void    Channel::setTopicAuthor(const std::string& author) {
 	_topic.topicAuthor = author;
 }
 
-void    Channel::setTimestamp(void) {
+void    Channel::setTopicTimestamp(void) {
 	_topic.time = std::time(0);
-}
-
-std::time_t    Channel::getTimestamp(void) const {
-	return (_topic.time);
 }
 
 bool    Channel::isMode(const std::string& mode) const {
