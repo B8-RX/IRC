@@ -1,22 +1,9 @@
 #include "Server.hpp"
-#include "Client.hpp"
-#include "Channel.hpp"
+#include "libs.hpp"
 #include "ServerParsing.cpp"
 #include "ServerCommands.cpp"
 #include "ServerUtils.cpp"
-#include <string>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <iostream>
-#include <cstring>
-#include <unistd.h>
-#include <cerrno>
-#include <netdb.h>
-#include <stdlib.h>
-#include <fcntl.h>
-#include <algorithm>
-#include <queue>
+#include "ServerMessaging.cpp"
 
 bool Server::_signalReceived = false;
 

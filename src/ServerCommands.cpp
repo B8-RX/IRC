@@ -1,7 +1,7 @@
+#include "libs.hpp"
 #include "Server.hpp"
 #include "Client.hpp"
-#include <iostream>
-#include <set>
+#include "Channel.hpp"
 
 bool	Server::_dispatchCommand(int clientFd, s_Line& sLine) {
 	
@@ -674,7 +674,6 @@ bool	Server::_handleKick(Client& cli, const s_Line& sline) {
 	return (true);
 }
 
-
 //? Command: INVITE
 //? Parameters: <nickname> <channel>
 //? ====> INVITE Wiz #foo_bar    ; Invite Wiz to #foo_bar
@@ -984,7 +983,6 @@ bool	Server::_handleMode(Client& cli, s_Line& sline) {
 	}
 	return (true);
 }
-
 
 int	Server::_handleSingleMode(Channel::s_mode& smode, Channel& chan, Client& cli, s_Line& sline) {
 	int ret = 0;

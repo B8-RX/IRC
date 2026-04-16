@@ -2,13 +2,7 @@
 #ifndef CHANNEL_HPP
  #define CHANNEL_HPP
 
-#include <string>
-#include <map>
-#include <set>
-#include <vector>
-#include <cstddef>
-#include <ctime>
-
+ #include "libs.hpp"
 
  class Channel {
 	 public:
@@ -31,7 +25,6 @@
 		
 		// members/Operator		
 		struct MemberState {
-			//! bool	isFounder;
 			bool    isChanOp;
 			MemberState(void) : isChanOp(false) {}
 			MemberState(bool isOp) : isChanOp(isOp) {}

@@ -1,19 +1,10 @@
 #ifndef SERVER_HPP
 # define SERVER_HPP
 
-#include <exception>
-#include <string>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <vector>
-#include <poll.h>
-#include <signal.h>
+
 #include "Client.hpp"
 #include "Channel.hpp"
-#include <map>
-#include <utility>
-#include <sstream>
-
+#include "libs.hpp"
 
 #define RED "\033[31m"
 #define GREEN "\033[32m"
