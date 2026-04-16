@@ -53,6 +53,16 @@ std::map<int, Channel::MemberState>&   Channel::getMembers(void) {
 	return (_members);
 }
 
+std::vector<int>	Channel::getMembersList(void) {
+	std::vector<int>	chanList;
+	const std::map<int, Channel::MemberState>&	chanMemb = getMembers();
+	std::map<int, Channel::MemberState>::const_iterator	chanMembIt = chanMemb.begin();
+	for (; chanMembIt != chanMemb.end(); ++chanMembIt) {
+		chanList.push_back(chanMembIt->first);
+	}
+	return (chanList);
+}
+
 bool    Channel::addInvite(int memberFd) {
 	return (_inviteList.insert(memberFd).second);
 }

@@ -4,6 +4,8 @@ TODO 15/04/2026
 - JOIN avec keys multiples
 - mettre des limites pour la taille des username nickname topicname channelName...
 
+- notif a l'arriver sur un forum
+- notif already on the channel
 
 Supporter :
 

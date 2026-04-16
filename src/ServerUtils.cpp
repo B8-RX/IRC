@@ -27,9 +27,6 @@ void	Server::_printLogServer(const std::string& type, const Client& cli, const s
 	else {
 		message = info;
 	}
-	if (sline.command == "PRIVMSG" && type == "INFO") {
-		color = BLUE;
-	}
 	std::cout << color << "[" << type << "]" << message << " [END]" << RESET << "\n";
 }
 
@@ -82,7 +79,7 @@ std::string	Server::_generateLogInfo(const s_Line& sline, const Client& cli, con
 		message = " " + nickName + std::string(YELLOW) + " unsubscribed from channel " + std::string(GREEN) + info; 
 	}
 	else if (sline.command == "PRIVMSG") {
-		message = " " + nickName + " send message to " + info; 
+		message = " " + nickName + std::string(YELLOW) + " send message to " + std::string(GREEN) + info; 
 	}
 	else if (sline.command == "KICK") {
 		std::string reason = (sline.params.size() >= 3 ? sline.params[2] : "");
@@ -449,9 +446,16 @@ void	Server::_sendErrUserNotInChannel(Client& cli, const std::string& nick, cons
 	_sendToClient(cli.fd, line);
 }
 
-void	Server::_notifyChanMembers(const std::vector<std::string>& cliChannels, int clientFd, const std::string& msg) {
+void	Server::_sendErrUserDontMatch(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const {
+	(void)placeholder;
+	std::string	numeric = " 502 ";
+	std::string line = ":" + _serverName + numeric + nick + " :Cant change mode for other users";
+	_printLogServer("DEBUG", cli, sline, line);
+	_sendToClient(cli.fd, line);
+}
+
+void	Server::_notifyMembersOfAllChannels(const std::vector<std::string>& cliChannels, int clientFd, const std::string& msg, const std::string& cmd) {
 	std::set<int>				listMembersToNotify;
-	
 	// loop on the client's channel list to store the fd member to notify (unique broadcast per member)
 	for (std::size_t i = 0; i < cliChannels.size(); ++i) {
 		std::string			channelName = cliChannels[i];
@@ -459,12 +463,11 @@ void	Server::_notifyChanMembers(const std::vector<std::string>& cliChannels, int
 		if (chanIt == _channelList.end()) {
 			continue;
 		}
-
 		Channel&								channel = chanIt->second;
 		const std::map<int, Channel::MemberState>& 	members = channel.getMembers();
 		std::map<int, Channel::MemberState>::const_iterator it = members.begin();
 		for (; it != members.end(); ++it) {
-			if (it->first == clientFd) {
+			if (it->first == clientFd && cmd == "QUIT") {
 				continue;
 			}
 			if (listMembersToNotify.find(it->first) == listMembersToNotify.end()) {
@@ -474,6 +477,17 @@ void	Server::_notifyChanMembers(const std::vector<std::string>& cliChannels, int
 		}
 	}
 }
+
+void	Server::_notifyMembersSingleChan(const std::vector<int>& memberList, int clientFd, const std::string& msg) {		
+	for (std::size_t i = 0; i < memberList.size(); ++i) {
+		if (memberList[i] == clientFd) {
+			continue;
+		}
+		_sendToClient(memberList[i], msg);
+	}
+}
+
+
 
 void	Server::_sendRplWelcome(const Client& cli) const {
 	std::string	numeric = " 001 ";
@@ -519,6 +533,16 @@ void	Server::_sendRplMyInfo(const Client& cli) const {
 	std::string	nick = cli.getNickname();
 	std::string modes	= " itkol are supported by this server";
 	std::string message = ":" + _serverName + numeric + nick + " " + _serverName + modes; 
+
+	_sendToClient(cli.fd, message);
+
+}
+
+void	Server::_sendRplUmodeIs(const Client& cli) const {
+	std::string	numeric = " 221 ";
+	std::string	nick = cli.getNickname();
+	std::string modes	= " itkol are supported by this server";
+	std::string message = ":" + _serverName + numeric + "+"; 
 
 	_sendToClient(cli.fd, message);
 

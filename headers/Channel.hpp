@@ -42,6 +42,7 @@
 		bool							removeMember(int memberFd);
 		bool							isMember(int memberFd) const;
 		std::map<int, MemberState>& 	getMembers(void);
+		std::vector<int>				getMembersList(void);
 
 
 		// topic

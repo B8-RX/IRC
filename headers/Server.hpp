@@ -69,7 +69,8 @@ class Server {
 		void							_closeServer(void);
 
 		// messaging
-		void							_notifyChanMembers(const std::vector<std::string>& chanList, int clientFd, const std::string& msg);
+		void							_notifyMembersSingleChan(const std::vector<int>& memberList, int clientFd, const std::string& msg);
+		void							_notifyMembersOfAllChannels(const std::vector<std::string>& chanList, int clientFd, const std::string& msg, const std::string& cmd);
 		void							_sendToClient(int clientFd, const std::string& message) const;
 	
 		void							_sendErrNeedMoreParams(Client& cli, const std::string& nick, const s_Line& sline, const std::string& cmd) const;
@@ -94,11 +95,13 @@ class Server {
 		void							_sendErrBadChannelKey(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
 		void							_sendErrInviteOnlyChan(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;
 		void							_sendErrUnknownMode(Client& cli, const std::string& nick, const s_Line& sline, const char mode) const;
+		void							_sendErrUserDontMatch(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const;
 		
 		void							_sendRplWelcome(const Client& cli) const;
 		void							_sendRplYourHost(const Client& cli) const;
 		void							_sendRplCreated(const Client& cli) const;
 		void							_sendRplMyInfo(const Client& cli) const;
+		void							_sendRplUmodeIs(const Client& cli) const;
 		void							_sendRplInviteList(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const;
 		void							_sendEndOfInviteList(Client& cli, const std::string& nick, const s_Line& sline, const std::string& placeholder) const;
 		void							_sendRplInviting(Client& cli, const std::string& nick, const s_Line& sline, const std::string& chanName) const;

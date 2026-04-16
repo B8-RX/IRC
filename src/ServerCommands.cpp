@@ -15,7 +15,11 @@ bool	Server::_dispatchCommand(int clientFd, s_Line& sLine) {
 	}
 
 	if (sLine.command == "PASS") {
-		return (_handlePass(*pCli, sLine));
+		if (_passwordEnabled && !_handlePass(*pCli, sLine)) {
+			_cleanupClient(*pCli, "PASS");
+			return (false);
+		}
+		return (true);
 	}
 	else if (sLine.command == "NICK") {
 		return (_handleNick(*pCli, sLine));
@@ -155,7 +159,7 @@ bool	Server::_handleNick(Client& cli, const s_Line& sline) {
 		
 		std::vector<std::string>	cliChannels = cli.getSubscribedChannels();
 		
-		_notifyChanMembers(cliChannels, cli.fd, message);
+		_notifyMembersOfAllChannels(cliChannels, cli.fd, message, sline.command);
 	}
 
 	cli.setNickname(sline.params[0]);
@@ -221,7 +225,8 @@ bool	Server::_handleUser(Client& cli, const s_Line& sline) {
 //? ===> JOIN #foo,#bar fubar,foobar	; join channel #foo using key "fubar". and channel #bar using key "foobar".	
 //? message <=== :WiZ JOIN #Twilight_zone        ; WiZ is joining the channel #Twilight_zone
 //? message <===  :dan-!d@localhost JOIN #test    ; dan- is joining the channel #test
-bool	Server::_handleJoin(Client& cli, const s_Line& sline) {
+
+bool	Server::_handleJoin(Client& cli , const s_Line& sline) {
 	
 	// validation 
 	
@@ -265,6 +270,7 @@ bool	Server::_handleJoin(Client& cli, const s_Line& sline) {
 		if (pChan == NULL) {
 			continue;
 		} 
+
 		bool		isFirstMember = (pChan->memberCount() == 0);
 		
 		if (pChan->isMember(cli.fd)) {
@@ -311,8 +317,11 @@ bool	Server::_handleJoin(Client& cli, const s_Line& sline) {
 		if (!cli.isMemberChan(channelName)) {
 			cli.addSubscriptionChan(channelName);
 		}
-
+		std::string	prefix = ":" + cli.getNickname() + "!" + cli.getUsername() + "@" + _serverName;
+		std::string msg = prefix + " JOIN " + channelName;
+		std::vector<int>	membersList = pChan->getMembersList();
 		_printLogServer("INFO", cli, sline, channelName);
+		_notifyMembersSingleChan(membersList, cli.fd, msg);
 		_sendRplTopic(cli, clientNick, sline, pChan->getTopic()); 
 	}
 	return (true);
@@ -397,7 +406,6 @@ bool	Server::_handlePart(Client& cli, const s_Line& sline) {
 		else {
 			_sendErrNoSuchChannel(cli, clientNick, sline, channelName);
 		}
-
 	}
 	return (true);
 }
@@ -420,7 +428,7 @@ bool	Server::_handleQuit(Client& cli, const s_Line& sline) {
 
 	// send QUIT message to all the members that shares a channel with the issuer
 	std::vector<std::string>	cliChannels = cli.getSubscribedChannels();
-	_notifyChanMembers(cliChannels, cli.fd, message);
+	_notifyMembersOfAllChannels(cliChannels, cli.fd, message, sline.command);
 
 	// send a QUIT acknowledgement to the client
 	message = "ERROR :Closing Link: Quit:";
@@ -801,6 +809,18 @@ bool	Server::_handleMode(Client& cli, s_Line& sline) {
 	if (clientNick.empty()) {
 		clientNick = "*";
 	}
+	// check and handle if its user Mode
+	if (sline.params[0][0] != '#') {
+		//check if not owner nick
+		//! ERR_USERSDONTMATCH (502)
+		if (clientNick != sline.params[0]) {
+			_sendErrUserDontMatch(cli, clientNick, sline, "");
+			return (false);
+		}
+		//! RPL_UMODEIS (221)
+		_sendRplUmodeIs(cli);
+		return (false);
+	}
 	
 	// check if param minimum is 1
 	//!	ERR_NEEDMOREPARAMS (461) 
@@ -808,7 +828,6 @@ bool	Server::_handleMode(Client& cli, s_Line& sline) {
 		_sendErrNeedMoreParams(cli, clientNick, sline, sline.command);
 		return (false);
 	}
-	
 	std::string	channelName = sline.params[0];
 	// check if channel exist
 	//!	ERR_NOSUCHCHANNEL (403)
@@ -839,7 +858,8 @@ bool	Server::_handleMode(Client& cli, s_Line& sline) {
 			modestring += (" " + pChan->getKey());
 		}
 		if (pChan->isMode("l")) {
-			modestring += (" " + pChan->getLimitChannel());
+			modestring += " ";
+			modestring += pChan->getLimitChannel();
 		}
 		_sendRplChannelModeIs(cli, clientNick, sline, modestring);
 		_sendRplCreationTime(cli, clientNick, sline, pChan->getCreationTime());
