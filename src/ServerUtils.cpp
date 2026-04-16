@@ -164,6 +164,9 @@ void	Server::_printServerInfo(void) const {
 
 
 bool    Server::_isValidNick(const std::string& nick) const {
+	if (nick.size() > 9) {
+		return (false);
+	}
 	std::string	disallowedFirstChar = "0123456789:#"; 
 	std::string allowedChar = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ[]{}|\\-_.";
 	if (disallowedFirstChar.find(nick[0]) != std::string::npos)
@@ -187,6 +190,9 @@ bool    Server::_isUsedNick(std::map<int, Client>& ClientsList, const std::strin
 }
 
 bool    Server::_isValidChannelName(const std::string& name) const {
+	if (name.size() > 50) {
+		return (false);
+	}
 	std::string	disallowedChar = ":# ,\r\n"; 
 	if (name.size() <= 1 || name[0] != '#')
 		return (false);
@@ -457,6 +463,7 @@ void	Server::_sendErrUserDontMatch(Client& cli, const std::string& nick, const s
 void	Server::_notifyMembersOfAllChannels(const std::vector<std::string>& cliChannels, int clientFd, const std::string& msg, const std::string& cmd) {
 	std::set<int>				listMembersToNotify;
 	// loop on the client's channel list to store the fd member to notify (unique broadcast per member)
+
 	for (std::size_t i = 0; i < cliChannels.size(); ++i) {
 		std::string			channelName = cliChannels[i];
 		std::map<std::string, Channel>::iterator chanIt = _channelList.find(channelName);

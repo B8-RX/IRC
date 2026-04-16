@@ -131,7 +131,7 @@ void	Server::_handleReceivedData(int clientFd) {
 		//?INFO: end of line reached or client disconnected. cleanup...
 		//TODO send QUIT acknowledgement to other users whom share the same channel with this client
 		//TODO add log of the quit
-		_cleanupClient(*pCli, "");
+		_cleanupClient(pCli->fd, "");
 		return ;
 	}
 	else if (readBytes == -1) {
@@ -165,93 +165,104 @@ bool	Server::_updateRegisteredState(int clientFd) {
 	return (cli->getRegirstered());
 }
 
-void	Server::_cleanupClient(const Client& cli, const std::string& cmd) {
+void	Server::_cleanupClient(int clientFd, const std::string& cmd) {
+
+	Client* cli = getClient(clientFd);
+	if (cli == NULL) {
+		return;
+	}
+	std::string	nickname = cli->getNickname();
+	std::string username = cli->getUsername();
+	std::string ipAddr = cli->ipAddr;
 
 	if (cmd != "PASS") {
-		std::vector<std::string>	cliChannels = cli.getSubscribedChannels();
-		std::string prefix = ":" + cli.getNickname() + "!" + cli.getUsername() + "@" + cli.ipAddr;
-		std::string	message;
-		std::set<int>		notifiedUser;
-		// boucler sur la liste des channels dont le client est membre
-		for (std::size_t i = 0; i < cliChannels.size(); ++i) {
-			
-			// recuperer le channel
-			std::string			chanName = cliChannels[i];
-			std::map<std::string, Channel>::iterator chanIt = _channelList.find(chanName);
-			if (chanIt == _channelList.end()) {
-				continue;
-			} 
-			Channel&			channel = chanIt->second;
-			if (channel.isMember(cli.fd)) {
-	
-				// notifier tout les membre que le client a quitter le network
-				const std::map<int, Channel::MemberState>&	chanMembers = channel.getMembers();
-				std::map<int, Channel::MemberState>::const_iterator membersIt = chanMembers.begin();
-				bool	foundChanOp = false;
-				std::string prefix = ":" + cli.getNickname() + "!" + cli.getUsername() + "@" + cli.ipAddr;
-				message = prefix + " QUIT :Connection closed";
-				for (; membersIt != chanMembers.end(); ++membersIt) {
-					if (!foundChanOp && membersIt->first != cli.fd && membersIt->second.isChanOp == true) {
-						foundChanOp = true;
-					}
-					if (membersIt->first == cli.fd || notifiedUser.find(membersIt->first) != notifiedUser.end()) {
-						continue;
-					}
-					if (cmd.empty()) {
-						_sendToClient(membersIt->first, message);
-						notifiedUser.insert(membersIt->first);
-					}
-				}
-				// retirer le client de la liste des membres du channel
-				channel.removeMember(cli.fd);
+		std::vector<std::string>	cliChannels = cli->getSubscribedChannels();
+		if (!cliChannels.empty()) {
+			std::string prefix = ":" + nickname + "!" + username + "@" + ipAddr;
+			std::string	message;
+			std::set<int>		notifiedUser;
+			// boucler sur la liste des channels dont le client est membre
+			for (std::size_t i = 0; i < cliChannels.size(); ++i) {
 				
-				// check if the client was operator if yes check if there is another op in the channel
-				if (channel.memberCount() > 0 && !foundChanOp) {
-					int newOpFd = -1;
-					std::string	newOpNick;
-					std::string msg = ":" + _serverName + " MODE " + chanName + " +o ";
-					std::map<int, Channel::MemberState>&	members = channel.getMembers();
-					std::map<int, Channel::MemberState>::iterator opMemberIt = members.begin();
-					newOpFd = opMemberIt->first;
-					channel.updateMemberState(newOpFd, true);
-					newOpNick = getClient(newOpFd)->getNickname();
-					msg += newOpNick;
-					for (; opMemberIt != members.end(); ++opMemberIt) {
-						_sendToClient(opMemberIt->first, msg);
+				// recuperer le channel
+				std::string			chanName = cliChannels[i];
+				std::map<std::string, Channel>::iterator chanIt = _channelList.find(chanName);
+				if (chanIt == _channelList.end()) {
+					continue;
+				} 
+				Channel&			channel = chanIt->second;
+				if (channel.isMember(clientFd)) {
+		
+					// notifier tout les membre que le client a quitter le network
+					const std::map<int, Channel::MemberState>&	chanMembers = channel.getMembers();
+					std::map<int, Channel::MemberState>::const_iterator membersIt = chanMembers.begin();
+					bool	foundChanOp = false;
+					std::string prefix = ":" + nickname + "!" + username + "@" + ipAddr;
+					message = prefix + " QUIT :Connection closed";
+					for (; membersIt != chanMembers.end(); ++membersIt) {
+						if (!foundChanOp && membersIt->first != clientFd && membersIt->second.isChanOp == true) {
+							foundChanOp = true;
+						}
+						if (membersIt->first == clientFd || notifiedUser.find(membersIt->first) != notifiedUser.end()) {
+							continue;
+						}
+						if (cmd.empty()) {
+							_sendToClient(membersIt->first, message);
+							notifiedUser.insert(membersIt->first);
+						}
+					}
+					// retirer le client de la liste des membres du channel
+					channel.removeMember(clientFd);
+					
+					// check if the client was operator if yes check if there is another op in the channel
+					if (channel.memberCount() > 0 && !foundChanOp) {
+						int newOpFd = -1;
+						std::string	newOpNick;
+						std::string msg = ":" + _serverName + " MODE " + chanName + " +o ";
+						std::map<int, Channel::MemberState>&	members = channel.getMembers();
+						std::map<int, Channel::MemberState>::iterator opMemberIt = members.begin();
+						newOpFd = opMemberIt->first;
+						channel.updateMemberState(newOpFd, true);
+						newOpNick = getClient(newOpFd)->getNickname();
+						msg += newOpNick;
+						for (; opMemberIt != members.end(); ++opMemberIt) {
+							_sendToClient(opMemberIt->first, msg);
+						}
 					}
 				}
+				// supprimer le channel si vide
+				if (channel.empty()) {
+					_channelList.erase(chanIt);
+				}
+				
 			}
-			// supprimer le channel si vide
-			if (channel.empty()) {
-				_channelList.erase(chanIt);
-			}
-			
 		}
 	}
 	
 	// retirer la structure poll qui surveillait les events sur le socket du client
 	for (std::size_t i = 0; i < _pollfdList.size(); ++i) {
-		if (_pollfdList[i].fd == cli.fd) {
+		if (_pollfdList[i].fd == clientFd) {
 			_pollfdList.erase(_pollfdList.begin() + i);
 			break;
 		}
 	}
 	
-	// fermer le socket
-	if (cli.fd != -1) {
-		std::cout << "close client socket [" << cli.fd << "]\n";
-		close(cli.fd);
-	}
 	// retirer le client de la liste des clients du serveur
-	if (_clientList.find(cli.fd) != _clientList.end()) {
-		_clientList.erase(cli.fd);
+	if (_clientList.find(clientFd) != _clientList.end()) {
+		_clientList.erase(clientFd);
+	}
+
+	// fermer le socket
+	if (clientFd != -1) {
+		std::cout << "close client socket [" << clientFd << "]\n";
+		close(clientFd);
 	}
 
 	if (cmd == "PASS") {
 		std::cout << "[DEBUG]: QUIT :Connection closed [END]\n";
 	}
 	else {
-		std::string prefix = cli.getNickname() + "!" + cli.getUsername() + "@" + cli.ipAddr;
+		std::string prefix = nickname + "!" + username + "@" + ipAddr;
 		std::string message = prefix + " QUIT :Connection closed";
 		std::cout << "[" << "DEBUG" << "]: " << message << " [END]\n";
 	}
@@ -259,7 +270,7 @@ void	Server::_cleanupClient(const Client& cli, const std::string& cmd) {
 
 void	Server::_closeServer(void) {
 	while (!_clientList.empty()) {
-		_cleanupClient(_clientList.begin()->second, "");
+		_cleanupClient(_clientList.begin()->second.fd, "");
 	}
 	if (_serverSocket != -1) {
 		std::cout << "cleanup Sever [" << _serverSocket << "]\n";

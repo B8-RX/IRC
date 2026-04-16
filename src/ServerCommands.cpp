@@ -13,10 +13,12 @@ bool	Server::_dispatchCommand(int clientFd, s_Line& sLine) {
 	if (clientNick.empty()) {
 		clientNick = "*";
 	}
-
+	if (sLine.command == "CAP") {
+		return (_handleCap(*pCli, sLine));
+	}
 	if (sLine.command == "PASS") {
 		if (_passwordEnabled && !_handlePass(*pCli, sLine)) {
-			_cleanupClient(*pCli, "PASS");
+			_cleanupClient(pCli->fd, "PASS");
 			return (false);
 		}
 		return (true);
@@ -71,6 +73,27 @@ bool	Server::_dispatchCommand(int clientFd, s_Line& sLine) {
 	return (true);
 }
 
+//? Command:  CAP
+//? Parameters:  <subcommand> [:<capabilities>]
+//? ===> Server: CAP * LS :
+
+bool	Server::_handleCap(Client& cli, const s_Line& sline) {
+	std::string option = sline.params[0];
+	std::string prefix = ":" + _serverName;
+	std::string message;
+	if (option == "LS") {
+		std::string nick = cli.getNickname();
+		if (nick.empty()) {
+			message = prefix + " LS * :";
+		}
+		else {
+			message = prefix + " " + nick + " LS * :";
+		}
+		_sendToClient(cli.fd, message);
+		_printLogServer("DEBUG", cli, sline, message);
+	}
+	return (true);
+}
 
 //? Command:  PASS
 //? Parameters:  <password>
@@ -158,8 +181,9 @@ bool	Server::_handleNick(Client& cli, const s_Line& sline) {
 		std::string					message = prefix + " NICK " + newNick;
 		
 		std::vector<std::string>	cliChannels = cli.getSubscribedChannels();
-		
-		_notifyMembersOfAllChannels(cliChannels, cli.fd, message, sline.command);
+		if (!cliChannels.empty()) {
+			_notifyMembersOfAllChannels(cliChannels, cli.fd, message, sline.command);
+		}
 	}
 
 	cli.setNickname(sline.params[0]);
@@ -186,6 +210,7 @@ bool	Server::_handleNick(Client& cli, const s_Line& sline) {
 bool	Server::_handleUser(Client& cli, const s_Line& sline) {
 
 	// validation 
+	
 	std::string clientNick =cli.getNickname();
 
 	if (clientNick.empty()) {
@@ -199,10 +224,14 @@ bool	Server::_handleUser(Client& cli, const s_Line& sline) {
 		_sendErrAlreadyRegistered(cli, clientNick, sline, ""); 
 		return (false);
 	}
-	
+	std::string	username = sline.params[0];
+	if (username.size() > 12) {
+		 username =	username.substr(0, 12);
+	}
+
 	// execution
 
-	cli.setUsername(( "~" + sline.params[0]));
+	cli.setUsername(( "~" + username));
 	cli.setRealname(sline.params[3]);
 	cli.hasUser = true;
 	_printLogServer("INFO", cli, sline, sline.command);
@@ -428,18 +457,20 @@ bool	Server::_handleQuit(Client& cli, const s_Line& sline) {
 
 	// send QUIT message to all the members that shares a channel with the issuer
 	std::vector<std::string>	cliChannels = cli.getSubscribedChannels();
-	_notifyMembersOfAllChannels(cliChannels, cli.fd, message, sline.command);
-
+	if (!cliChannels.empty()) {
+		_notifyMembersOfAllChannels(cliChannels, cli.fd, message, sline.command);
+	}
 	// send a QUIT acknowledgement to the client
 	message = "ERROR :Closing Link: Quit:";
 	if (!reason.empty()) {
-		message += " "  + reason;
+		message += " ";
+		message += reason;
 	}
 	_sendToClient(cli.fd, message);
 	_printLogServer("INFO", cli, sline, sline.command);
 	
 	// clean the client from the server and close his socket
-	_cleanupClient(cli, sline.command);
+	_cleanupClient(cli.fd, sline.command);
 	return (true);
 }
 
@@ -467,11 +498,14 @@ bool	Server::_handlePing(Client& cli, const s_Line& sline) {
 //? ===> PRIVMSG Angel :yes I'm receiving it ! ; Command to send a message to Angel.
 //? message <=== :Angel PRIVMSG Wiz :Hello are you receiving this message ? ; Message from Angel to Wiz.
 //? message <=== :dan!~h@localhost PRIVMSG #coolpeople :Hi everyone!  ; Message from dan to the channel #coolpeople
+
 bool	Server::_handlePrivmsg(Client& cli, const s_Line& sline) {
 
 	std::string clientNick = (cli.getNickname().empty() ? "*" : cli.getNickname());
 	std::string clientUsername = (cli.getUsername().empty() ? "*" : cli.getUsername());
 	
+
+	// validation 
 	if (sline.params.empty()) {
 		_sendErrNoRecipient(cli, clientNick, sline, sline.command);
 		return (false);
@@ -480,12 +514,18 @@ bool	Server::_handlePrivmsg(Client& cli, const s_Line& sline) {
 		_sendErrNoTextToSend(cli, clientNick, sline, "");
 		return (false);
 	}
-	bool		sendAtLeastOne = false;
+
+	//construct the message prefix and crop the text to sent if > 400 characters
 	std::string targetParam = sline.params[0];
+	std::string prefix = ":" + clientNick + "!" + clientUsername + "@" + cli.ipAddr;	
 	std::string privMsg = sline.params[1];
-	std::string prefix = ":" + clientNick + "!" + clientUsername + "@" + cli.ipAddr;
-	
+	if (privMsg.size() > 400) {
+		privMsg = privMsg.substr(0, 400);
+	}
+
+	// execution
 	// to handle multi target ex: #chan1,#chan2... split on every comma ',' until the end
+	bool		sendAtLeastOne = false;
 	while (!targetParam.empty()) {
 		std::size_t	commaPos = targetParam.find(',');
 		std::string targetName;
@@ -502,7 +542,6 @@ bool	Server::_handlePrivmsg(Client& cli, const s_Line& sline) {
 		}
 		
 		// construct the full message
-
 		std::string message = prefix + " PRIVMSG " + targetName + " :" + privMsg;
 		
 		// check if is target is a channel or a user
@@ -521,19 +560,19 @@ bool	Server::_handlePrivmsg(Client& cli, const s_Line& sline) {
 			sendAtLeastOne = true;
 		}
 		else {
-			// check if channel exist
+			// check if the channel exist
 			Channel* pChan = getChannel(targetName); 
 			std::string	targetChannel = targetName;
 			if (pChan == NULL) {
 				_sendErrNoSuchChannel(cli, clientNick, sline, targetChannel);
 				continue;
 			}
-			// check if client is member
+			// check if client is member of the channel
 			if (!pChan->isMember(cli.fd)) {
 				_sendErrCannotSendToChan(cli, clientNick, sline, targetChannel);
 				continue;
 			}
-			// send the message
+			// send the message on the channel
 			const std::map<int, Channel::MemberState>& members = pChan->getMembers();
 			std::map<int, Channel::MemberState>::const_iterator membersIt = members.begin();
 			for (; membersIt != members.end(); ++membersIt) {
@@ -546,7 +585,6 @@ bool	Server::_handlePrivmsg(Client& cli, const s_Line& sline) {
 			}
 		}
 	}
-	// if the targe is a user and the user is not connected send RPL_AWAY (301)
 	return (sendAtLeastOne);
 }
 
@@ -779,13 +817,18 @@ bool	Server::_handleTopic(Client& cli, s_Line& sline) {
 			_sendErrChaNoPrivsNeeded(cli, clientNick, sline, channelName);
 			return (false);
 		}
+		// crop the topic if > 400 characters
 		std::string topic = sline.params[1];
+		if (topic.size() > 400) {
+			topic = topic.substr(0, 400);
+		}
+		// set/update the topic, author and creation date
 		pChan->setTopic(topic);
 		pChan->setTopicAuthor(clientNick);
 		pChan->setTopicTimestamp();
 		_printLogServer("INFO", cli, sline, channelName);
 
-		//? Broadcast a TOPIC command to every client on the channel also for the author
+		// Broadcast a TOPIC command to every client on the channel also for the author
 		std::string prefix = ":" + clientNick + "!" + cli.getUsername() + "@" + cli.ipAddr;
 		std::string message = prefix + " TOPIC " + channelName + " :" + topic;
 		const std::map<int, Channel::MemberState>&	members = pChan->getMembers();

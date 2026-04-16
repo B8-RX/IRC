@@ -22,7 +22,8 @@
 #define MAGENTA "\033[35m"
 #define CYAN "\033[36m"
 #define RESET "\033[0m"
-
+#define MAX_NICK_LEN 9
+#define MAX_CHAN_LEN 50
 #define BUFFER_SIZE 1024
 
 class Server {
@@ -65,7 +66,7 @@ class Server {
 		int								_serverSocket;
 		void							_handleNewClient(void);
 		void							_handleReceivedData(int clientFd);
-		void							_cleanupClient(const Client& cli, const std::string& cmd);
+		void							_cleanupClient(int clientFd, const std::string& cmd);
 		void							_closeServer(void);
 
 		// messaging
@@ -126,6 +127,7 @@ class Server {
 		// validation/execution	
 		bool							_dispatchCommand(int clientFd, s_Line& sLine);
 
+		bool							_handleCap(Client& cli, const s_Line& sline);
 		bool							_handlePass(Client& cli, const s_Line& sline);
 		bool							_handleNick(Client& cli, const s_Line& sline);
 		bool							_handleUser(Client& cli, const s_Line& sline);
