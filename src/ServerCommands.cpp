@@ -964,18 +964,39 @@ bool	Server::_handleMode(Client& cli, s_Line& sline) {
 			std::string prefix = ":" + cli.getNickname() + "!" + cli.getUsername() + "@" + cli.ipAddr;
 			std::string message = prefix + " MODE " + channelName + " " + modestring;
 			
-			const std::map<int, Channel::MemberState>& members = pChan->getMembers();
+			std::map<int, Channel::MemberState>& members = pChan->getMembers();
 			std::map<int, Channel::MemberState>::const_iterator membIt = members.begin();
 	
 	
 			// notify all channel members of the mode(s) changes 
+			bool	foundChanOp = false;
 			for (; membIt != members.end(); ++membIt) {
 				if (membIt->second.isChanOp) {
+					foundChanOp = true;
 					_sendToClient(membIt->first, message + paramsFullChanOp);
 				}
 				else {
 					_sendToClient(membIt->first, message + paramsFull);
 				}
+			}
+			if (pChan->memberCount() > 1 && !foundChanOp) {
+				std::map<int, Channel::MemberState>::iterator newOpIt = members.begin();
+				if (newOpIt != members.end()) {
+					if (newOpIt->first == cli.fd) {
+						++newOpIt;
+					}
+					newOpIt->second.isChanOp = true;
+					Client* newOp = getClient(newOpIt->first);
+					if (newOp) {
+						std::string source = ":" + _serverName;
+						std::string msg = source + " MODE " + channelName + " +o " + newOp->getNickname();
+						std::vector<int>	membList = pChan->getMembersList();
+						_notifyMembersSingleChan(membList, -1, msg);
+						_printLogServer("INFO", cli, sline, msg);
+					}
+
+				}
+
 			}
 			std::string messageServerLog = modestring + paramsFullChanOp;
 			_printLogServer("INFO", cli, sline, messageServerLog);
