@@ -9,7 +9,12 @@ std::vector<std::string>	Server::_splitCRLF(int clientFd) {
 	size_t						posCRLF = std::string::npos;
 	Client*						client;
 
-	client = &_clientList[clientFd];
+	// client = &_clientList[clientFd];
+	std::map<int,Client>::iterator cliIt = _clientList.find(clientFd);
+	if (cliIt == _clientList.end()) {
+		return (vLines);
+	}
+	client = &cliIt->second;
 	while ((posCRLF = client->bufferIn.find("\r\n")) != std::string::npos) {
 			line = client->bufferIn.substr(0, posCRLF);
 			vLines.push_back(line);

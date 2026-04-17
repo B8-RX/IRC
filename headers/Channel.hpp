@@ -86,7 +86,6 @@
 		std::size_t					_userLimit;
 		bool						_keyEnabled;
 		std::string					_key;
-
  };
 
 #endif // !CHANNEL_HPP

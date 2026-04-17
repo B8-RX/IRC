@@ -829,7 +829,7 @@ bool	Server::_handleTopic(Client& cli, s_Line& sline) {
 
 		// Broadcast a TOPIC command to every client on the channel also for the author
 		std::string prefix = ":" + clientNick + "!" + cli.getUsername() + "@" + cli.ipAddr;
-		std::string message = prefix + " TOPIC " + channelName + " :" + topic;
+		std::string message = prefix + " TOPIC " + channelName + " " + topic;
 		const std::map<int, Channel::MemberState>&	members = pChan->getMembers();
 		std::map<int, Channel::MemberState>::const_iterator membersIt = members.begin();
 		for (; membersIt != members.end(); ++membersIt) {
@@ -953,7 +953,7 @@ bool	Server::_handleMode(Client& cli, s_Line& sline) {
 			std::string paramsFullChanOp;
 			for (std::size_t i = 0; i < smode.vParam.size(); ++i) {
 				if (paramKeyPos != std::string::npos && i == paramKeyPos) {
-						paramsFullChanOp += (" " + smode.vParam[i]);
+					paramsFullChanOp += (" " + smode.vParam[i]);
 					continue;
 				}
 				paramsFull += (" " + smode.vParam[i]);
@@ -1040,8 +1040,11 @@ int	Server::_handleSingleMode(Channel::s_mode& smode, Channel& chan, Client& cli
 			if (smode.add && !smode.param.empty()) {
 				std::istringstream iss(smode.param);
 				std::size_t limit;
-				if (iss >> limit && limit > 0) {
+				char c = '\0';
+				bool isValid = false;
+				if (iss >> limit && !(iss >> c) && limit > 0 && limit != std::string::npos) {
 					chan.setLimit(limit);
+					isValid = true;
 					if (smode.add && (smode.sign != '+')) {
 						smode.vMode.push_back('+');
 					}
@@ -1049,8 +1052,10 @@ int	Server::_handleSingleMode(Channel::s_mode& smode, Channel& chan, Client& cli
 						smode.vMode.push_back('-');
 					}
 				}
-				smode.vMode.push_back(smode.mode);
-				smode.vParam.push_back(smode.param);
+				if (isValid) {
+					smode.vMode.push_back(smode.mode);
+					smode.vParam.push_back(smode.param);
+				}
 				ret = 1;
 			}
 			else if (smode.minus && (smode.sign != '-')) {

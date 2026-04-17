@@ -13,7 +13,6 @@ class Client {
 	int             		        fd;
 	std::string     		        ipAddr;
 	std::string     		        bufferIn;
-	std::string     		        bufferOut;
 	
 	std::string						getNickname(void) const;
 	std::string						getOldNickname(void) const;
