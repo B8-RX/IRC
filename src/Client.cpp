@@ -7,6 +7,10 @@ std::string Client::getNickname(void) const {
     return (_nickname);
 }
 
+std::string Client::getOldNickname(void) const {
+    return (_oldNickname);
+}
+
 std::string Client::getUsername(void) const {
     return (_username);
 }
@@ -26,6 +30,11 @@ bool    Client::getRegirstered(void) const {
 const std::string& Client::setNickname(const std::string& nick) {
     _nickname = nick;
     hasNick = true;
+    return (_nickname);
+}
+
+const std::string& Client::setOldNickname(const std::string& nick) {
+    _oldNickname = nick;
     return (_nickname);
 }
 
@@ -50,7 +59,7 @@ bool    Client::setRegirstered(bool state) {
     return (_registered);
 }
 
-bool    Client::addMemberChan(const std::string& name) {
+bool    Client::addSubscriptionChan(const std::string& name) {
     _channels.push_back(name); 
     return (true);
 }
@@ -62,6 +71,21 @@ bool    Client::isMemberChan(const std::string& name) const {
     }
     return (false);
 }
-const std::vector<std::string>	Client::getSubscribedChannels(void) const {
+const std::vector<std::string>&	Client::getSubscribedChannels(void) const {
     return (_channels);
+}
+
+bool    Client::removeSubscribedChannel(const std::string& target) {
+    std::vector<std::string>::iterator it = _channels.begin();
+
+    for (; it != _channels.end(); ++it) {
+        if (*it == target) {
+            break;
+        }
+    }
+    if (it == _channels.end()) {
+        return (false);
+    }
+    _channels.erase(it);
+    return (true);
 }

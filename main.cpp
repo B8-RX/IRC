@@ -44,31 +44,22 @@ int	main(int argc, char **argv) {
 		return (1);
 	}
 
-	Server	myServer;
 	try {
-/*!
- * @brief Check if the port is valid
- * @param argv The command line arguments
- */
+	std::string	password = (argc == 3) ? argv[2] : ""; 
 	std::istringstream iss(argv[1]);
 	uint16_t	port;
 	char	c;
+	
 	if (!(iss >> port) || iss >> c) {
 		std::cerr << "Invalid port number: " << argv[1] << "\n";
 		return (1);
 	}
-/*!
- * @brief Initialize the server
- * @param port The port number to listen on
- */
-
-	std::string password;
-	password = (argc == 3) ? argv[2] : ""; 
-	myServer.init(port, password);
+	
+	Server	myServer(port, password);
+	myServer.init();
 	myServer.run();
 	} catch (std::exception& e) {
 		std::cerr << e.what() << "\n";
-		myServer.closeSockets();
 	}
 	std::cout << "Server Closed! Bye Bye!\n";
 	return (0);

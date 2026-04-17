@@ -1,0 +1,14 @@
+
+
+//////////////////
+
+
+
+DOCUMENTATION LEGENDS
+| Symbole | Signification  |    |
+| ------- | -------------- | -- |
+| `<>`    | obligatoire    |    |
+| `[]`    | optionnel      |    |
+| `*`     | 0 ou plusieurs |    |
+| `1*`    | 1 ou plusieurs |    |
+| `       | `              | OU |
